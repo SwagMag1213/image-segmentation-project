@@ -1,107 +1,63 @@
 # SAMARBEJDSKONTRAKT
 
-## Projekttitel:
+## Projekttitel: Image Segmentation of Labeled Cell Images
 
 ## Gruppedeltagere:
+Josefine Høgsted Voglhofer (s231255)
+Micki Kanaiya Harning (s234866)
+Magnus Sehested Thormann (s234830)
+Poul Guo Skov (s224193)
+ 
 
-## Vejleder:
 
-Afsæt ca. 2 timer til at udarbejde gruppens samarbejdskontrakt. Det er vigtigt, at alle gruppemedlemmer på forhånd har overvejet deres holdning til de punkter, der skal diskuteres og træffes beslutning om.
+## Vejleder: Alisa Pavel & Manja G Grønberg
 
 ---
 
 ## 1 - MØDER
 
 ### a) Tid og sted:
-- Vil vi aftale en fast ugentlig mødedag?
-- Hvor skal møderne foregå?
-- Hvad er tidsrammen for møderne?
-- Kan nogle af møderne foregå over nettet?
+- Som udgangspunkt mødes gruppen online 1-2 gange ugentligt onsdag og eventuelt torsdag.
 
 ### b) Afbud til møder:
-- Skal vi melde afbud til møder, hvis vi er forhindrede?
-- Hvordan?
+- Man melder afbud senest om morgenen på dagen, hvis man ikke er i stand til at mødes online.
 
 ### c) Referat:
-- Vil vi tage referat til møderne?
-- Hvad er deadline på udarbejdelse og fremsendelse af referat?
-- Skal referaterne lægges på CampusNet?
+- Som udgangspunkt tages der ikke referater. Vigtige dokumenter lægges på GitHub, og andre aftaler kan undtagelsesvist dokumenteres i gruppechatten.
 
 ### d) Roller:
-- Hvor ofte vil vi skiftes til at have forskellige roller (ordstyrer, mødeleder, referent, koordinator)?
+- Ved hvert møde, bliver rollerne uddelegeret efter lyst og behov.
 
 ### e) Beslutninger:
-- Hvordan vil vi træffe beslutninger - ved enighed eller ved flertalsafgørelser?
-
-**Eksempler:**  
-- Vi reserverer onsdag formiddag til gruppemøder. Normalt mødes vi kl. 9-12 i gruppelokale XX, medmindre andet aftales på det forudgående møde.
-- Der tages kun referat, hvis vi træffer beslutninger om projektet/projektforløbet. Vi skiftes til at lave referat.
+- Som udgangspunkt træffes beslutninger ved enighed. Skulle en særdeles hed diskussion opstå, kan afstemning være en løsning
 
 ---
 
 ## 2 - KOMMUNIKATION I GRUPPEN
 
-Hvordan sikrer vi, at alle altid får den nødvendige information?
-
 ### a) Praktisk kommunikation:
-- Skal det ske pr. e-mail, chat, sms, telefon eller...?
+- Møder foregår på Discord, planlægning og andre praktiske beskeder foregår på Messenger.
 
 ### b) Faglig kommunikation:
-- Skal det ske pr. e-mail, via CampusNet eller...?
-
-### c) Introverte vs. ekstroverte:
-- Hvis gruppen både indeholder introverte og ekstroverte, hvordan håndterer vi det i det daglige arbejde?
-
-**Eksempler:**
-- Liste over e-mailadresser og mobilnumre lægges på CampusNet.
-- Praktisk information udveksles via sms eller mail.
-- Dokumenter til gruppearbejde lægges på CampusNet, og besked om nye/opdaterede dokumenter udsendes via CampusNet som mail og/eller sms.
+- GitHub til kode og vigtige dokumenter.
 
 ---
 
 ## 3 - INDSATS OG FORVENTNINGER
 
 ### a) Flextid:
-- Skal hvert gruppemedlem lave lige meget altid?
-- Er det okay, at vi yder forskelligt på forskellige tidspunkter?
+- I gruppen er der en bred forståelse for at man kan yde efter evne. Vi forventer at alle vil bidrage til bedste evne, men at man selvfølgelig kan have en slap dag en gang i mellem. 
 
 ### b) Forventninger:
-- Hvad er gruppens succeskriterier?
-- At alle har ejerskab for projektet og at alle føler, at vi lærer noget?
-- Kun at bestå eksamen?
+- At alle lærer noget og at alle føler ejerskab over projektet.
 
 ### c) Ejerskab:
-- Hvordan vil vi hver især bidrage til at nå de fælles succeskriterier?
-- Hvad er vi hver især gode til?
-
-**Eksempler:**
-- Vi går efter, at alle i gruppen får min. ___ i karakter for rapporten!
-- Vi synes, det er OK, at vi bidrager forskelligt til projektarbejdet.
-- Alle i gruppen skal kunne forstå og forklare alle afsnit i rapporten.
-- Vi udskyder ikke rapportskrivningen, men skriver løbende afsnit til den.
-- Vi reserverer hele onsdag til gruppearbejde i forbindelse med rapportskrivning i de sidste 2 uger inden aflevering.
-- Hvis vi har aftalt at forberede noget til et gruppemøde, er kun sygdom en undskyldning for ikke at have gjort det!
+- Vi ønsker at alle i gruppen føler ejerskab over projektet som helhed.
 
 ---
 
 ## 4 - PROBLEMER
 
-### Hvad gør vi, hvis...
-- Et gruppemedlem altid kommer for sent til møderne?
-- Et gruppemedlem aldrig afleverer det aftalte til tiden?
-- 2 eller flere gruppemedlemmer har dårlig kemi sammen, og det indvirker på gruppens arbejde?
+- Skulle problemer opstå, må vi ved møder prøve at omstrukterer gruppens måde at arbejde, så sådanne problemer kan undgås igen.
 
-**Eksempler:**
-- Vi afsætter tid på hvert gruppemøde til at diskutere evt. problemer i gruppen. Alle kan tage problemer op, der vedrører ethvert gruppemedlem (inkl. en selv).
-- Hvis der er problemer, som ikke løses efter, at det har været diskuteret to gange, går vi til underviseren.
-
----
-
-Samarbejdskontrakten skal underskrives af alle gruppemedlemmer og vedlægges som en del af jeres projektplan, der afleveres i uge 4 på Inside.
-
-Dette oplæg stammer fra kursusmaterialet i DTU’s pædagogiske kursus. Dog har jeg lavet enkle ændringer for at få det til at passe til Matematik og Teknologis fælles ramme for fagprojekter.  
-**Peter Røgen**
-
-Disse rammer passer også til Kunstig Intelligens og Data fagprojekter.  
-**Morten Mørup**
 
