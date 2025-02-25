@@ -1,0 +1,2 @@
+## Project plan - Image segmentation
+
