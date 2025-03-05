@@ -1,63 +1,59 @@
-# SAMARBEJDSKONTRAKT
+### **SAMARBEJDSKONTRAKT**
 
-## Projekttitel: Image Segmentation of Labeled Cell Images
+#### **Projekttitel:** Image Segmentation of Labeled Cell Images
 
-## Gruppedeltagere:
-Josefine Høgsted Voglhofer (s231255)
-Micki Kanaiya Harning (s234866)
-Magnus Sehested Thormann (s234830)
-Poul Guo Skov (s224193)
- 
+#### **Gruppedeltagere:**
+- Josefine Høgsted Voglhofer (s231255)  
+- Micki Kanaiya Harning (s234866)  
+- Magnus Sehested Thormann (s234830)  
+- Poul Guo Skov (s224193)  
 
-
-## Vejleder: Alisa Pavel & Manja G Grønberg
+#### **Vejledere:** Alisa Pavel & Manja G. Grønberg
 
 ---
 
-## 1 - MØDER
+## **1 - MØDER**
 
 ### a) Tid og sted:
-- Som udgangspunkt mødes gruppen online 1-2 gange ugentligt onsdag og eventuelt torsdag.
+- Gruppen mødes som udgangspunkt **online 1-2 gange om ugen** på onsdage og eventuelt torsdage. 
 
 ### b) Afbud til møder:
-- Man melder afbud senest om morgenen på dagen, hvis man ikke er i stand til at mødes online.
+- Afbud skal meldes **senest om morgenen samme dag** via gruppens kommunikationskanal, hvis man er forhindret i at deltage.
 
 ### c) Referat:
-- Som udgangspunkt tages der ikke referater. Vigtige dokumenter lægges på GitHub, og andre aftaler kan undtagelsesvist dokumenteres i gruppechatten.
+- Der tages som udgangspunkt **ikke referater**. Vigtige beslutninger og dokumenter uploades på **GitHub**, mens mindre aftaler kan noteres i gruppechatten.  
 
 ### d) Roller:
-- Ved hvert møde, bliver rollerne uddelegeret efter lyst og behov.
+- Roller fordeles **fleksibelt** fra møde til møde baseret på lyst og behov.
 
 ### e) Beslutninger:
-- Som udgangspunkt træffes beslutninger ved enighed. Skulle en særdeles hed diskussion opstå, kan afstemning være en løsning
+- Beslutninger træffes som udgangspunkt **ved enighed**. Hvis enighed ikke kan opnås, kan en **afstemning** anvendes som løsning.
 
 ---
 
-## 2 - KOMMUNIKATION I GRUPPEN
+## **2 - KOMMUNIKATION I GRUPPEN**
 
 ### a) Praktisk kommunikation:
-- Møder foregår på Discord, planlægning og andre praktiske beskeder foregår på Messenger.
+- **Discord** anvendes til møder, mens **Messenger** bruges til planlægning og praktiske beskeder.
 
 ### b) Faglig kommunikation:
-- GitHub til kode og vigtige dokumenter.
+- **GitHub** anvendes til deling af kode og vigtige dokumenter for at sikre overskuelighed og dokumentation.
 
 ---
 
-## 3 - INDSATS OG FORVENTNINGER
+## **3 - INDSATS OG FORVENTNINGER**
 
 ### a) Flextid:
-- I gruppen er der en bred forståelse for at man kan yde efter evne. Vi forventer at alle vil bidrage til bedste evne, men at man selvfølgelig kan have en slap dag en gang i mellem. 
+- Gruppen har en **fleksibel tilgang** til arbejdsindsats. Alle forventes at bidrage efter bedste evne, men det accepteres, at man kan have mindre produktive dage.
 
 ### b) Forventninger:
-- At alle lærer noget og at alle føler ejerskab over projektet.
+- Målet er, at **alle lærer noget** og føler **ejerskab** over projektet. 
 
 ### c) Ejerskab:
-- Vi ønsker at alle i gruppen føler ejerskab over projektet som helhed.
+- Vi ønsker, at alle i gruppen føler **ansvar og engagement** for projektet som helhed.
 
 ---
 
-## 4 - PROBLEMER
+## **4 - HÅNDTERING AF PROBLEMER**
 
-- Skulle problemer opstå, må vi ved møder prøve at omstrukterer gruppens måde at arbejde, så sådanne problemer kan undgås igen.
-
-
+- Hvis problemer opstår, forsøger vi at løse dem ved **åben dialog** på møderne. Hvis nødvendigt, justerer vi gruppens arbejdsform for at undgå lignende problemer fremover.
