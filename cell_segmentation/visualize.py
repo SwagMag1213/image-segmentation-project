@@ -1,7 +1,7 @@
 import torch
 import matplotlib.pyplot as plt
 
-def visualize_predictions(model, loader, device, num_samples=3):
+def visualize_predictions(model, loader, device, num_samples=3, save_path=None):
     """
     Visualize model predictions vs ground truth
     
@@ -10,6 +10,7 @@ def visualize_predictions(model, loader, device, num_samples=3):
         loader: DataLoader containing images and masks
         device: Device to run on (cuda, mps, or cpu)
         num_samples: Number of samples to visualize
+        save_path: Optional path to save the figure
     """
     model.eval()
     
@@ -51,4 +52,10 @@ def visualize_predictions(model, loader, device, num_samples=3):
         axs[2, i].axis('off')
     
     plt.tight_layout()
-    plt.show()
+    
+    # Save the figure if a save path is provided
+    if save_path:
+        plt.savefig(save_path, dpi=200, bbox_inches='tight')
+        print(f"Visualization saved to {save_path}")
+    
+    return fig

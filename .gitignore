@@ -1,4 +1,5 @@
 data/
 local/
 cell_segmentation/experiments/
+cell_segmentation/experiments_results/
 cell_segmentation/manual_labels/

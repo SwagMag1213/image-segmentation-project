@@ -179,7 +179,6 @@ def train_model(train_loader, test_loader, model, criterion, optimizer, schedule
     plt.grid(True)
     
     plt.savefig(f"{config['save_dir']}/training_curves.png", dpi=200)
-    plt.show()
     
     # Return results
     return {
