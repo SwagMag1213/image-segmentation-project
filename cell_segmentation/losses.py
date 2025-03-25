@@ -97,6 +97,62 @@ class BoundaryLoss(nn.Module):
         weighted_bce = (weight_map * bce).mean()
         
         return weighted_bce
+    
+class SoftNCutLoss(nn.Module):
+    def __init__(self, img_size=(256, 256), radius=5, ox=4, oi=10):
+        super().__init__()
+        self.img_size = img_size
+        self.radius = radius
+        self.ox = ox
+        self.oi = oi
+
+    def forward(self, image, enc):
+        return self.soft_n_cut_loss(image, enc)
+
+    def soft_n_cut_loss(self, image, enc):
+        loss = []
+        batch_size = image.shape[0]
+        k = enc.shape[1]
+        weights = self.calculate_weights(image, batch_size)
+        for i in range(k):
+            loss.append(self.soft_n_cut_loss_single_k(weights, enc[:, i:i+1], batch_size))
+        da = torch.stack(loss)
+        return torch.mean(k - torch.sum(da, dim=0))
+
+    def calculate_weights(self, input, batch_size):
+        p = self.radius
+        image = torch.mean(input, dim=1, keepdim=True)
+        image = F.pad(image, (p, p, p, p), mode='constant', value=0)
+
+        kh, kw = 2 * p + 1, 2 * p + 1
+        patches = image.unfold(2, kh, 1).unfold(3, kw, 1)
+        patches = patches.contiguous().view(batch_size, 1, -1, kh, kw)
+        patches = patches.permute(0, 2, 1, 3, 4).view(-1, 1, kh, kw)
+
+        center_values = patches[:, :, p, p].unsqueeze(-1).unsqueeze(-1).expand(-1, 1, kh, kw)
+        distance_weights = (torch.arange(kh) - p).view(1, -1).repeat(kh, 1).to(input.device)
+        distance_weights = (distance_weights ** 2 + distance_weights.T ** 2).float()
+        mask = distance_weights.le(self.radius)
+        distance_weights = torch.exp(-distance_weights / self.ox ** 2) * mask
+
+        patches = torch.exp(-((patches - center_values) ** 2) / self.oi ** 2)
+        return patches * distance_weights
+
+    def soft_n_cut_loss_single_k(self, weights, enc, batch_size):
+        p = self.radius
+        kh, kw = 2 * p + 1, 2 * p + 1
+        encoding = F.pad(enc, (p, p, p, p), mode='constant', value=0)
+
+        seg = encoding.unfold(2, kh, 1).unfold(3, kw, 1)
+        seg = seg.contiguous().view(batch_size, 1, -1, kh, kw)
+        seg = seg.permute(0, 2, 1, 3, 4).view(-1, 1, kh, kw)
+
+        nom = weights * seg
+        h, w = self.img_size
+        numerator = torch.sum(enc * torch.sum(nom, dim=(1, 2, 3)).reshape(batch_size, h, w), dim=(1, 2, 3))
+        denominator = torch.sum(enc * torch.sum(weights, dim=(1, 2, 3)).reshape(batch_size, h, w), dim=(1, 2, 3))
+
+        return numerator / (denominator + 1e-8)
 
 def get_loss_function(config):
     """Initialize the appropriate loss function based on config"""
@@ -113,5 +169,7 @@ def get_loss_function(config):
                            theta=config.get('boundary_theta', 5))
     elif config['loss_fn'] == 'dice':
         return DiceLoss(smooth=config.get('smooth', 1.0))
+    elif config['loss_fn'] == 'softncut':
+        return SoftNCutLoss(img_size=config.get('img_size', (256, 256)))
     else:
         return ComboLoss(alpha=config.get('loss_alpha', 0.5))
