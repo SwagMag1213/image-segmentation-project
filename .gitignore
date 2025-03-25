@@ -5,3 +5,6 @@ cell_segmentation/experiments_results/
 cell_segmentation/manual_labels/
 cell_segmentation/__pycache__/
 *.py[cod]
+
+# macOS system file
+.DS_Store
