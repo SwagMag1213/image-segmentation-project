@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import copy
 from utils import calculate_metrics
 
-def train_epoch(model, loader, optimizer, criterion, device, criterion_recon=None):
+def train_epoch(model, loader, optimizer, criterion, device, criterion_recon=None, config=None):
     """Train one epoch for both U-Net and W-Net"""
     model.train()
     epoch_loss = 0
@@ -17,16 +17,25 @@ def train_epoch(model, loader, optimizer, criterion, device, criterion_recon=Non
         images = images.to(device)
         masks = masks.to(device)
 
-        # Handle W-Net (segmentation + reconstruction)
+        # Handle W-Net: if reconstruction loss is provided, assume two outputs from model
         if criterion_recon is not None:
             seg_output, recon_output = model(images)
-            loss_seg = criterion(seg_output, masks)
-            loss_recon = criterion_recon(recon_output, images)
-            loss = loss_seg + loss_recon
 
-        # Forward pass
+            # Fully unsupervised W-Net (NCut + MSE)
+            if config.get('loss_fn') == 'softncut':
+                loss_ncut = criterion(images, seg_output)  # Unsupervised segmentation loss
+                loss_recon = criterion_recon(recon_output, images)  # Reconstruction loss
+                loss = config['ncut_weight'] * loss_ncut + config['recon_weight'] * loss_recon
+
+            # Semi-supervised W-Net (segmentation loss + MSE)
+            else:
+                loss_seg = criterion(seg_output, masks)  # Supervised segmentation loss
+                loss_recon = criterion_recon(recon_output, images)  # Reconstruction loss
+                loss = loss_seg + loss_recon
+
+        # U-Net: standard supervised segmentation with no reconstruction
         else:
-            seg_outputs = model(images)
+            seg_output = model(images)
             loss = criterion(seg_output, masks)
         
         # Backward pass and optimization
@@ -53,7 +62,7 @@ def train_epoch(model, loader, optimizer, criterion, device, criterion_recon=Non
     metrics['loss'] = epoch_loss
     return metrics
 
-def evaluate(model, loader, device, criterion=None, criterion_recon=None):
+def evaluate(model, loader, device, criterion=None, criterion_recon=None, config=None):
     """Evaluate the model on the given data loader (supports U-Net and W-Net)"""
     model.eval()
     metrics = defaultdict(float)
@@ -64,33 +73,39 @@ def evaluate(model, loader, device, criterion=None, criterion_recon=None):
             images = images.to(device)
             masks = masks.to(device)
 
-            # Handle W-Net (seg + recon)
+            # W-Net: segmentation + reconstruction
             if criterion_recon is not None:
                 seg_output, recon_output = model(images)
 
-                # Compute combined loss
-                loss_seg = criterion(seg_output, masks)
-                loss_recon = criterion_recon(recon_output, images)
-                loss = loss_seg + loss_recon
+                if config.get('loss_fn') == 'softncut':
+                    # Unsupervised W-Net: NCut + MSE
+                    loss_ncut = criterion(images, seg_output)
+                    loss_recon = criterion_recon(recon_output, images)
+                    loss = config['ncut_weight'] * loss_ncut + config['recon_weight'] * loss_recon
+                    metrics['loss_ncut'] += loss_ncut.item() * images.size(0)
+                    metrics['loss_recon'] += loss_recon.item() * images.size(0)
+                else:
+                    # Semi-supervised W-Net: segmentation + reconstruction
+                    loss_seg = criterion(seg_output, masks)
+                    loss_recon = criterion_recon(recon_output, images)
+                    loss = loss_seg + loss_recon
+                    metrics['loss_seg'] += loss_seg.item() * images.size(0)
+                    metrics['loss_recon'] += loss_recon.item() * images.size(0)
+
+            # U-Net: segmentation only
             else:
                 seg_output = model(images)
-                if criterion is not None:
-                    loss = criterion(seg_output, masks)
-
-            batch_size = images.size(0)
-
-            # Add loss
-            if criterion is not None:
-                metrics['loss'] += loss.item() * batch_size
+                loss = criterion(seg_output, masks)
+                metrics['loss_seg'] += loss.item() * images.size(0)
 
             # Compute IoU and other metrics
             preds = torch.sigmoid(seg_output)
             batch_metrics = calculate_metrics(preds, masks)
 
             for k, v in batch_metrics.items():
-                metrics[k] += v * batch_size
+                metrics[k] += v * images.size(0)
 
-            num_samples += batch_size
+            num_samples += images.size(0)
 
     # Normalize
     for k in metrics:
@@ -129,11 +144,11 @@ def train_model(train_loader, test_loader, model, criterion, optimizer, schedule
     
     for epoch in range(num_epochs):
         # Train one epoch
-        train_metrics = train_epoch(model, train_loader, optimizer, criterion, device, criterion_recon)
+        train_metrics = train_epoch(model, train_loader, optimizer, criterion, device, criterion_recon, config=config)
         train_metrics_history.append(train_metrics)
         
         # Evaluate on test set
-        test_metrics = evaluate(model, test_loader, device, criterion)
+        test_metrics = evaluate(model, test_loader, device, criterion, criterion_recon=criterion_recon, config=config)
         test_metrics_history.append(test_metrics)
         
         # Update learning rate
