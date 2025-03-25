@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 def visualize_predictions(model, loader, device, num_samples=3, save_path=None):
     """
-    Visualize model predictions vs ground truth
+    Visualize model predictions vs ground truth (supports U-Net and W-Net)
     
     Args:
         model: Neural network model
@@ -22,18 +22,28 @@ def visualize_predictions(model, loader, device, num_samples=3, save_path=None):
     
     # Generate predictions
     with torch.no_grad():
-        preds = torch.sigmoid(model(images))
-    
+        outputs = model(images)
+
+    # Handle W-Net (tuple output) or U-Net (single output)
+    if isinstance(outputs, tuple):
+        preds, recon = outputs
+    else:
+        preds = outputs
+        recon = None
+
     # Move back to CPU for visualization
     images = images.cpu()
     masks = masks.cpu()
-    preds = preds.cpu()
+    preds = torch.sigmoid(preds).cpu()
+    if recon is not None:
+        recon = recon.cpu()
     
     # Limit to requested number of samples
     num_samples = min(num_samples, len(images))
     
-    # Create figure
-    fig, axs = plt.subplots(3, num_samples, figsize=(4*num_samples, 10))
+    # Define number of rows based on model type
+    rows = 4 if recon is not None else 3
+    fig, axs = plt.subplots(rows, num_samples, figsize=(4*num_samples, 4*rows))
     
     for i in range(num_samples):
         # Display image
@@ -50,6 +60,11 @@ def visualize_predictions(model, loader, device, num_samples=3, save_path=None):
         axs[2, i].imshow((preds[i, 0] > 0.5).float(), cmap='gray')
         axs[2, i].set_title(f'Prediction')
         axs[2, i].axis('off')
+
+        if recon is not None:
+            axs[3, i].imshow(recon[i, 0], cmap='gray')
+            axs[3, i].set_title("Reconstruction")
+            axs[3, i].axis('off')
     
     plt.tight_layout()
     

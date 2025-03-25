@@ -9,11 +9,13 @@ from tqdm.auto import tqdm
 from collections import defaultdict
 import copy
 import time
+import torch.nn as nn
 
 from dataset import CellSegmentationDataset
 from losses import get_loss_function
 from utils import get_device, calculate_metrics
 from visualize import visualize_predictions
+from wnet import WNet
 
 def prepare_cross_validation_data(data_dir, image_type, n_splits=5, img_size=(256, 256), seed=42):
     """
@@ -148,12 +150,24 @@ def cross_validate(model_class, config, data_dir, n_splits=5):
         )
         
         # Initialize model
-        model = model_class(
-            n_classes=1, 
-            backbone=config['backbone'],
-            pretrained=config['pretrained'],
-            use_attention=config['use_attention']
-        )
+        if config.get('model_type', 'unet') == 'wnet':
+            model = WNet(
+                n_channels=1,
+                n_classes=1,
+                backbone=config['backbone'],
+                pretrained=config['pretrained'],
+                use_attention=config['use_attention']
+            )
+            criterion_recon = nn.MSELoss()
+        else:
+            model = model_class(
+                n_classes=1, 
+                backbone=config['backbone'],
+                pretrained=config['pretrained'],
+                use_attention=config['use_attention']
+            )
+            criterion_recon = None
+
         model = model.to(device)
         
         # Initialize loss function
@@ -201,8 +215,15 @@ def cross_validate(model_class, config, data_dir, n_splits=5):
                 masks = masks.to(device)
                 
                 # Forward pass
-                outputs = model(images)
-                loss = criterion(outputs, masks)
+                if criterion_recon is not None:
+                    seg_output, recon_output = model(images)
+                    loss_seg = criterion(seg_output, masks)
+                    loss_recon = criterion_recon(recon_output, images)
+                    loss = loss_seg + loss_recon
+                    outputs = seg_output  # for metric evaluation
+                else:
+                    outputs = model(images)
+                    loss = criterion(outputs, masks)
                 
                 # Backward pass and optimization
                 optimizer.zero_grad()
@@ -238,10 +259,16 @@ def cross_validate(model_class, config, data_dir, n_splits=5):
                     images = images.to(device)
                     masks = masks.to(device)
                     
-                    outputs = model(images)
-                    
-                    # Calculate loss
-                    loss = criterion(outputs, masks)
+                    if criterion_recon is not None:
+                        seg_output, recon_output = model(images)
+                        loss_seg = criterion(seg_output, masks)
+                        loss_recon = criterion_recon(recon_output, images)
+                        loss = loss_seg + loss_recon
+                        outputs = seg_output  # Use segmentation output for metric evaluation
+                    else:
+                        outputs = model(images)
+                        loss = criterion(outputs, masks)
+
                     batch_size = images.size(0)
                     val_metrics['loss'] += loss.item() * batch_size
                     
@@ -291,7 +318,12 @@ def cross_validate(model_class, config, data_dir, n_splits=5):
                 images = images.to(device)
                 masks = masks.to(device)
                 
-                outputs = model(images)
+                # Handle W-Net (segmentation + reconstruction) or U-Net
+                if criterion_recon is not None:
+                    seg_output, recon_output = model(images)
+                    outputs = seg_output
+                else:
+                    outputs = model(images)
                 
                 # Calculate metrics
                 batch_metrics = calculate_metrics(torch.sigmoid(outputs), masks)

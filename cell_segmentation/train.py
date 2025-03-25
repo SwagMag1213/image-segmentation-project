@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 import copy
 from utils import calculate_metrics
 
-def train_epoch(model, loader, optimizer, criterion, device):
-    """Train the model for one epoch"""
+def train_epoch(model, loader, optimizer, criterion, device, criterion_recon=None):
+    """Train one epoch for both U-Net and W-Net"""
     model.train()
     epoch_loss = 0
     metrics = defaultdict(float)
@@ -16,10 +16,18 @@ def train_epoch(model, loader, optimizer, criterion, device):
     for images, masks in loader:
         images = images.to(device)
         masks = masks.to(device)
-        
+
+        # Handle W-Net (segmentation + reconstruction)
+        if criterion_recon is not None:
+            seg_output, recon_output = model(images)
+            loss_seg = criterion(seg_output, masks)
+            loss_recon = criterion_recon(recon_output, images)
+            loss = loss_seg + loss_recon
+
         # Forward pass
-        outputs = model(images)
-        loss = criterion(outputs, masks)
+        else:
+            seg_outputs = model(images)
+            loss = criterion(seg_output, masks)
         
         # Backward pass and optimization
         optimizer.zero_grad()
@@ -28,15 +36,14 @@ def train_epoch(model, loader, optimizer, criterion, device):
         
         # Calculate metrics
         with torch.no_grad():
-            batch_metrics = calculate_metrics(torch.sigmoid(outputs), masks)
+            batch_metrics = calculate_metrics(torch.sigmoid(seg_output), masks)
             batch_size = images.size(0)
             
             for k, v in batch_metrics.items():
                 metrics[k] += v * batch_size
             
             num_samples += batch_size
-        
-        epoch_loss += loss.item() * batch_size
+            epoch_loss += loss.item() * batch_size
     
     # Normalize metrics
     epoch_loss /= num_samples
@@ -46,41 +53,52 @@ def train_epoch(model, loader, optimizer, criterion, device):
     metrics['loss'] = epoch_loss
     return metrics
 
-def evaluate(model, loader, device, criterion=None):
-    """Evaluate the model on the given data loader"""
+def evaluate(model, loader, device, criterion=None, criterion_recon=None):
+    """Evaluate the model on the given data loader (supports U-Net and W-Net)"""
     model.eval()
     metrics = defaultdict(float)
     num_samples = 0
-    
+
     with torch.no_grad():
         for images, masks in loader:
             images = images.to(device)
             masks = masks.to(device)
-            
-            outputs = model(images)
-            
-            # Calculate loss if criterion is provided
-            if criterion is not None:
-                loss = criterion(outputs, masks)
-                batch_size = images.size(0)
-                metrics['loss'] += loss.item() * batch_size
-            
-            # Calculate metrics
-            batch_metrics = calculate_metrics(torch.sigmoid(outputs), masks)
+
+            # Handle W-Net (seg + recon)
+            if criterion_recon is not None:
+                seg_output, recon_output = model(images)
+
+                # Compute combined loss
+                loss_seg = criterion(seg_output, masks)
+                loss_recon = criterion_recon(recon_output, images)
+                loss = loss_seg + loss_recon
+            else:
+                seg_output = model(images)
+                if criterion is not None:
+                    loss = criterion(seg_output, masks)
+
             batch_size = images.size(0)
-            
+
+            # Add loss
+            if criterion is not None:
+                metrics['loss'] += loss.item() * batch_size
+
+            # Compute IoU and other metrics
+            preds = torch.sigmoid(seg_output)
+            batch_metrics = calculate_metrics(preds, masks)
+
             for k, v in batch_metrics.items():
                 metrics[k] += v * batch_size
-            
+
             num_samples += batch_size
-    
-    # Normalize metrics
+
+    # Normalize
     for k in metrics:
         metrics[k] /= num_samples
-    
+
     return metrics
 
-def train_model(train_loader, test_loader, model, criterion, optimizer, scheduler, num_epochs, device, config):
+def train_model(train_loader, test_loader, model, criterion, optimizer, scheduler, num_epochs, device, config, criterion_recon=None):
     """
     Train and evaluate the model
     
@@ -111,7 +129,7 @@ def train_model(train_loader, test_loader, model, criterion, optimizer, schedule
     
     for epoch in range(num_epochs):
         # Train one epoch
-        train_metrics = train_epoch(model, train_loader, optimizer, criterion, device)
+        train_metrics = train_epoch(model, train_loader, optimizer, criterion, device, criterion_recon)
         train_metrics_history.append(train_metrics)
         
         # Evaluate on test set

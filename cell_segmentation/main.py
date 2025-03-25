@@ -12,12 +12,14 @@ from train import train_model
 from cross_validation import cross_validate
 from utils import ensure_dir, get_device
 from visualize import visualize_predictions
+from wnet import WNet  # <- NEW: W-Net
 
 # Define configuration
 def get_config():
     """Define a specific model configuration"""
     return {
         'name': 'resnet34',
+        'model_type': 'wnet',              # 'unet' or 'wnet'
         'image_type': 'W',                # 'W' for broadband cells
         'backbone': 'resnet34',
         'use_attention': False,            # Use attention mechanism
@@ -67,12 +69,21 @@ def main():
     )
     
     # Create model
-    model = UNetWithBackbone(
-        n_classes=1,
-        backbone=config['backbone'],
-        pretrained=config['pretrained'],
-        use_attention=config['use_attention']
-    )
+    if config['model_type'] == 'wnet':
+        model = WNet(
+            n_channels=1,
+            n_classes=1,
+            backbone=config['backbone'],
+            pretrained=config['pretrained'],
+            use_attention=config['use_attention']
+        )
+    else:
+        model = UNetWithBackbone(
+            n_classes=1,
+            backbone=config['backbone'],
+            pretrained=config['pretrained'],
+            use_attention=config['use_attention']
+        )
     
     # Get device
     device = get_device()
@@ -93,6 +104,12 @@ def main():
         optimizer, mode='max', factor=0.5, patience=5, threshold=0.01, min_lr=1e-6
     )
     
+    # Optional second loss for W-Net
+    criterion_recon = None
+    if config['model_type'] == 'wnet':
+        import torch.nn as nn
+        criterion_recon = nn.MSELoss()          
+
     # Train the model
     full_train_result = train_model(
         train_loader=train_loader,
@@ -103,7 +120,8 @@ def main():
         scheduler=scheduler,
         num_epochs=config['num_epochs'],
         device=device,
-        config=config
+        config=config,
+        criterion_recon=criterion_recon  # Pass reconstruction loss for W-Net
     )
     
     # Save full training results
