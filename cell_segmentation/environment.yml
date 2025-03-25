@@ -1,0 +1,27 @@
+name: segmentation-project
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - python=3.10
+
+  # Deep Learning Framework
+  - pytorch>=1.10
+  - torchvision>=0.11
+  #- cudatoolkit=11.3  # Optional: remove if using CPU-only
+
+  # Computer Vision
+  - opencv>=4.5
+  - albumentations>=1.1.0
+
+  # Data Processing and Analysis
+  - numpy>=1.21
+  - pandas>=1.3
+  - scipy>=1.7
+  - scikit-learn>=1.0
+
+  # Visualization
+  - matplotlib>=3.5
+
+  # Progress Bars
+  - tqdm>=4.62
