@@ -151,3 +151,21 @@ def ensure_dir(directory):
     """Ensure a directory exists"""
     if not os.path.exists(directory):
         os.makedirs(directory)
+
+class EarlyStopping:
+    def __init__(self, patience=10, min_delta=0.001):
+        self.patience = patience
+        self.min_delta = min_delta
+        self.counter = 0
+        self.best_score = None
+        self.early_stop = False
+
+    def step(self, current_score):
+        if self.best_score is None or current_score > self.best_score + self.min_delta:
+            self.best_score = current_score
+            self.counter = 0
+        else:
+            self.counter += 1
+            if self.counter >= self.patience:
+                self.early_stop = True
+        return self.early_stop
