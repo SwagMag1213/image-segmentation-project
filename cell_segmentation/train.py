@@ -4,7 +4,8 @@ from tqdm.auto import tqdm
 from collections import defaultdict
 import matplotlib.pyplot as plt
 import copy
-from utils import calculate_metrics
+from utils import calculate_metrics, EarlyStopping
+import csv
 
 def train_epoch(model, loader, optimizer, criterion, device, criterion_recon=None, config=None):
     """Train one epoch for both U-Net and W-Net"""
@@ -142,6 +143,16 @@ def train_model(train_loader, test_loader, model, criterion, optimizer, schedule
     print("Starting training...")
     start_time = time.time()
     
+    early_stopping = EarlyStopping(
+        patience=config.get('early_stopping_patience', 7),
+        min_delta=config.get('early_stopping_min_delta', 0.001)
+    )
+
+    metrics_csv_path = f"{config['save_dir']}/metrics_log.csv"
+    with open(metrics_csv_path, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(["epoch", "train_loss", "test_loss", "train_iou", "test_iou", "lr"])
+
     for epoch in range(num_epochs):
         # Train one epoch
         train_metrics = train_epoch(model, train_loader, optimizer, criterion, device, criterion_recon, config=config)
@@ -167,12 +178,29 @@ def train_model(train_loader, test_loader, model, criterion, optimizer, schedule
               f"Test IoU: {test_metrics['iou']:.4f}, "
               f"LR: {current_lr:.6f}")
         
+        # Log metrics to CSV
+        with open(metrics_csv_path, mode='a', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow([
+                epoch + 1,
+                train_metrics['loss'],
+                test_metrics.get('loss', test_metrics.get('loss_seg', 0.0)),
+                train_metrics['iou'],
+                test_metrics['iou'],
+                current_lr
+            ])
+        
         # Save best model
         if test_metrics['iou'] > best_iou:
             best_iou = test_metrics['iou']
             best_model_state = copy.deepcopy(model.state_dict())
             best_epoch = epoch
             print(f"Saved new best model with IoU: {best_iou:.4f}")
+
+        # Early stopping check
+        if early_stopping.step(test_metrics['iou']):
+            print(f"Early stopping triggered at epoch {epoch+1}")
+            break
     
     # Training complete
     time_elapsed = time.time() - start_time
