@@ -17,26 +17,28 @@ from wnet import WNet  # <- NEW: W-Net
 def get_config_unet():
     """Configuration for U-Net (supervised)"""
     return {
-        'name': 'unet_resnet34',
+        'name': 'unet_resnet50',
         'model_type': 'unet',
         'image_type': 'W',
-        'backbone': 'resnet34',
-        'use_attention': False,
-        'batch_size': 4,
+        'backbone': 'resnet50',
+        'use_attention': True,
+        'batch_size': 8,
         'img_size': (256, 256),
-        'num_epochs': 5,
+        'num_epochs': 50,
         'learning_rate': 1e-4,
         'weight_decay': 1e-5,
         'pretrained': True,
         'save_dir': 'experiments/unet',
         'seed': 42,
         'optimizer': 'adam',
-        'visualize_every': 5,
+        'visualize_every': 10,
         'save_visualizations': True,
         'save_model': True,
         'loss_fn': 'focal',
         'loss_alpha': 0.25,
         'focal_gamma': 2.0,
+        'early_stopping_patience': 10,
+        'early_stopping_min_delta': 0.001,
     }
 
 def get_config_wnet_semi():
@@ -70,9 +72,9 @@ def main():
     
     # Get configuration
 
-    #config = get_config_unet()
+    config = get_config_unet()
     #config = get_config_wnet_semi()
-    config = get_config_wnet_unsupervised()
+    #config = get_config_wnet_unsupervised()
     
     data_dir = 'data/manual_labels'  # Update this path to your data directory
     
