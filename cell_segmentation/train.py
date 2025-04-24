@@ -20,19 +20,12 @@ def train_epoch(model, loader, optimizer, criterion, device, criterion_recon=Non
 
         # Handle W-Net: if reconstruction loss is provided, assume two outputs from model
         if criterion_recon is not None:
-            seg_output, recon_output = model(images)
-
-            # Fully unsupervised W-Net (NCut + MSE)
-            if config.get('loss_fn') == 'softncut':
-                loss_ncut = criterion(images, seg_output)  # Unsupervised segmentation loss
-                loss_recon = criterion_recon(recon_output, images)  # Reconstruction loss
-                loss = config['ncut_weight'] * loss_ncut + config['recon_weight'] * loss_recon
-
             # Semi-supervised W-Net (segmentation loss + MSE)
-            else:
-                loss_seg = criterion(seg_output, masks)  # Supervised segmentation loss
-                loss_recon = criterion_recon(recon_output, images)  # Reconstruction loss
-                loss = loss_seg + loss_recon
+            seg_output, recon_output = model(images)
+            
+            loss_seg = criterion(seg_output, masks)  # Supervised segmentation loss
+            loss_recon = criterion_recon(recon_output, images)  # Reconstruction loss
+            loss = loss_seg + loss_recon
 
         # U-Net: standard supervised segmentation with no reconstruction
         else:
@@ -56,6 +49,40 @@ def train_epoch(model, loader, optimizer, criterion, device, criterion_recon=Non
             epoch_loss += loss.item() * batch_size
     
     # Normalize metrics
+    epoch_loss /= num_samples
+    for k in metrics:
+        metrics[k] /= num_samples
+    
+    metrics['loss'] = epoch_loss
+    return metrics
+
+def train_unsupervised_epoch(model, loader, optimizer, criterion_seg, criterion_recon, device, config):
+    model.train()
+    epoch_loss = 0
+    num_samples = 0
+    metrics = defaultdict(float)
+    
+    for images in loader:
+        images = images.to(device)
+        
+        # For unsupervised W-Net, assume the model returns both segmentation and reconstruction outputs
+        seg_output, recon_output = model(images)
+        
+        # Choose loss function based on the configuration
+        if config.get('loss_fn') == 'softncut':
+            loss_ncut = criterion_seg(images, seg_output)
+            loss_recon = criterion_recon(recon_output, images)
+            loss = config['ncut_weight'] * loss_ncut + config['recon_weight'] * loss_recon
+        
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        
+        batch_size = images.size(0)
+        epoch_loss += loss.item() * batch_size
+        num_samples += batch_size
+    
+    
     epoch_loss /= num_samples
     for k in metrics:
         metrics[k] /= num_samples
@@ -155,7 +182,11 @@ def train_model(train_loader, test_loader, model, criterion, optimizer, schedule
 
     for epoch in range(num_epochs):
         # Train one epoch
-        train_metrics = train_epoch(model, train_loader, optimizer, criterion, device, criterion_recon, config=config)
+        if config.get('loss_fn') == 'softncut':
+            # Unsupervised training for W-Net
+            train_metrics = train_unsupervised_epoch(model, train_loader, optimizer, criterion, criterion_recon, device, config)
+        else:
+            train_metrics = train_epoch(model, train_loader, optimizer, criterion, device, criterion_recon, config=config)
         train_metrics_history.append(train_metrics)
         
         # Evaluate on test set

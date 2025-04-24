@@ -54,6 +54,44 @@ class CellSegmentationDataset(Dataset):
         mask = torch.from_numpy(mask).unsqueeze(0)
         
         return image, mask
+    
+class CellSegmentationDatasetUnlabelled(Dataset):
+    def __init__(self, image_paths, img_size=(256, 256), normalize=True):
+        self.image_paths = image_paths
+        self.img_size = img_size
+        self.normalize = normalize
+
+    def normalize_microscopy_image(self, image):
+        # Remove outliers by clipping
+        p_low, p_high = np.percentile(image, [2, 98])
+        image_clipped = np.clip(image, p_low, p_high)
+        
+        # Apply CLAHE for local contrast enhancement
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        image_clahe = clahe.apply(image_clipped.astype(np.uint8))
+        
+        # Normalize to [0, 1]
+        image_norm = (image_clahe - image_clahe.min()) / (image_clahe.max() - image_clahe.min() + 1e-8)
+        return image_norm
+
+    def __len__(self):
+        return len(self.image_paths)
+    
+    def __getitem__(self, idx):
+        # Load the image in grayscale
+        image = cv2.imread(self.image_paths[idx], cv2.IMREAD_GRAYSCALE)
+        # Resize image to specified size
+        image = cv2.resize(image, self.img_size, interpolation=cv2.INTER_AREA)
+        
+        # Apply normalization
+        if self.normalize:
+            image = self.normalize_microscopy_image(image)
+        else:
+            image = image.astype(np.float32) / 255.0
+        
+        # Convert image to tensor (adds channel dimension)
+        image = torch.from_numpy(image.astype(np.float32)).unsqueeze(0)
+        return image
 
 def prepare_data(data_dir, image_type='both', test_size=0.2, batch_size=2, seed=42, img_size=(256, 256)):
     """
@@ -215,4 +253,63 @@ def prepare_augmented_data(data_dir, image_type, test_size=0.2, batch_size=2, se
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
     
+    return train_loader, test_loader
+
+def prepare_all_labeled_data(data_dir="manual_labels", image_type='both', img_size=(256, 256), batch_size=2):
+    # Paths to augmented directories
+    aug_dir = os.path.join(data_dir, f"augmented_{image_type}")
+    images_dir = os.path.join(aug_dir, "images")
+    masks_dir = os.path.join(aug_dir, "masks")
+    
+    # Verify that the augmented directories exist
+    if not os.path.exists(aug_dir):
+        raise FileNotFoundError(f"Augmented directory {aug_dir} not found.")
+    
+    all_files = sorted(os.listdir(images_dir))
+    
+    image_paths = []
+    mask_paths = []
+    
+    for file in all_files:
+        # Assumes the naming convention ensures that an image has a corresponding mask with the same filename in masks_dir.
+        image_path = os.path.join(images_dir, file)
+        mask_path = os.path.join(masks_dir, file)
+        
+        if os.path.exists(mask_path):
+            image_paths.append(image_path)
+            mask_paths.append(mask_path)
+    
+    print(f"Found {len(image_paths)} images with matching ground truth masks")
+    
+    # Create the dataset and the data loader
+    dataset = CellSegmentationDataset(image_paths, mask_paths, img_size=img_size)
+    loader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
+    return loader
+
+def prepare_unlabelled_data(data_dir, image_type='W', img_size=(256, 256), batch_size=2):
+    """
+    Prepare data loader for unsupervised training from unlabelled data.
+    
+    Args:
+        data_dir (str): Directory containing the 'unlabelled' folder.
+        image_type (str): '1W' to select broadband images or '1B' for fluorescent.
+        img_size (tuple): Target image size.
+        batch_size (int): Batch size for the data loader.
+        num_workers (int): Number of workers for data loading.
+    
+    Returns:
+        DataLoader: Unlabelled image loader.
+    """
+    if not os.path.exists(data_dir):
+        raise FileNotFoundError(f"Unlabelled directory not found at {data_dir}")
+    
+    all_files = sorted(os.listdir(data_dir))
+    image_paths = [os.path.join(data_dir, f) for f in all_files 
+                   if f.endswith(".tif") and f"_1{image_type}" in f]
+    
+    print(f"Found {len(image_paths)} unlabelled {image_type} images.")
+    
+    dataset = CellSegmentationDatasetUnlabelled(image_paths, img_size=img_size)
+    train_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    test_loader = prepare_all_labeled_data(data_dir="manual_labels", image_type=image_type, img_size=img_size, batch_size=batch_size)
     return train_loader, test_loader

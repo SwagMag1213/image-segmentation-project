@@ -3,6 +3,8 @@ local/
 cell_segmentation/experiments/
 cell_segmentation/experiments_results/
 cell_segmentation/manual_labels/
+cell_segmentation/Xcelligence_data-2/
+cell_segmentation/unlabelled/
 cell_segmentation/__pycache__/
 *.py[cod]
 

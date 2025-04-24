@@ -261,7 +261,7 @@ class UNetWithBackbone(nn.Module):
         
         return [x1, x2, x3, x4, x5]
         
-    def forward(self, x):
+    def forward(self, x, return_features=False):
         # Encoder path
         if self.backbone_name.startswith('resnet'):
             # ResNet encoder path
@@ -349,4 +349,9 @@ class UNetWithBackbone(nn.Module):
         # Final convolution
         out = self.conv_final(d0)
         
+        if return_features:
+            # For example, fuse x2 and x3: upsample x2 to match x3
+            x2_up = F.interpolate(x2, size=x3.shape[2:], mode='bilinear', align_corners=False)
+            combined_features = torch.cat([x2_up, x3], dim=1)
+            return out, combined_features
         return out
