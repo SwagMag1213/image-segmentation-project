@@ -5,7 +5,7 @@ import numpy as np
 from datetime import datetime
 
 # Import from our modular framework
-from dataset import prepare_augmented_data, prepare_unlabelled_data
+from dataset import prepare_augmented_data
 from advanced_models import UNetWithBackbone
 from losses import get_loss_function
 from train import train_model
@@ -17,15 +17,15 @@ from wnet import WNet  # <- NEW: W-Net
 def get_config_unet():
     """Configuration for U-Net (supervised)"""
     return {
-        'name': 'unet_resnet50',
+        'name': 'unet_2',
         'model_type': 'unet',
         'image_type': 'W',
-        'backbone': 'resnet34',
+        'backbone': 'resnet50',
         'use_attention': False,
         'batch_size': 2,
         'img_size': (128, 128),
-        'num_epochs': 20,
-        'learning_rate': 1e-3,
+        'num_epochs': 50,
+        'learning_rate': 1e-4,
         'weight_decay': 1e-5,
         'pretrained': True,
         'save_dir': 'experiments/unet',
@@ -61,7 +61,7 @@ def get_config_wnet_unsupervised():
         'save_dir': 'experiments/wnet_unsupervised',
         'use_ncut': True,
         'ncut_weight': 1.0,
-        'recon_weight': 1.5,
+        'recon_weight': 1.0,
     })
     return config
 
@@ -72,9 +72,11 @@ def main():
     
     # Get configuration
 
-    #config = get_config_unet()
+    config = get_config_unet()
     #config = get_config_wnet_semi()
-    config = get_config_wnet_unsupervised()
+    #config = get_config_wnet_unsupervised()
+    
+    data_dir = 'data/manual_labels'  # Update this path to your data directory
     
     # Update save directories with timestamp
     save_dir = f"{config['save_dir']}_{timestamp}"
@@ -88,22 +90,13 @@ def main():
     print("\n=== Training on Full Dataset ===\n")
     
     # Prepare data
-    if config.get('loss_fn') == 'softncut':
-        # For W-Net unsupervised training
-        train_loader, test_loader = prepare_unlabelled_data(
-            data_dir="unlabelled",
-            image_type=config['image_type'],
-            batch_size=config['batch_size'],
-            img_size=config['img_size']
-        )
-    else:
-        train_loader, test_loader = prepare_augmented_data(
-            data_dir="manual_labels",
-            image_type=config['image_type'],
-            batch_size=config['batch_size'],
-            img_size=config['img_size'],
-            seed=config['seed']
-        )
+    train_loader, test_loader = prepare_augmented_data(
+        data_dir=data_dir,
+        image_type=config['image_type'],
+        batch_size=config['batch_size'],
+        img_size=config['img_size'],
+        seed=config['seed']
+    )
     
     # Create model
     if config['model_type'] == 'wnet':
@@ -173,58 +166,54 @@ def main():
         model, test_loader, device, num_samples=5
     )
     
-    if config.get('loss_fn') == 'softncut':
-        print("\n=== Skipping Cross-Validation for unsupervised training ===\n")
-    else:
-        # PART 2: Perform cross-validation with the same configuration
-        print("\n=== Performing Cross-Validation ===\n")
-        
-        # Number of folds
-        n_splits = 5
-        
-
-        # Run cross-validation
-        cv_results = cross_validate(
-            model_class=UNetWithBackbone,
-            config=config,
-            data_dir="manual_labels",
-            n_splits=n_splits
-        )
-        
-        # Save cross-validation results
-        torch.save(cv_results, f"{save_dir}/cv_results.pth")
-        
-        # Compare full training vs cross-validation
-        full_train_iou = full_train_result['test_metrics'][-1]['iou']
-        cv_mean_iou = cv_results['cv_summary']['iou_mean']
-        cv_std_iou = cv_results['cv_summary']['iou_std']
-        
-        print("\n=== Results Comparison ===")
-        print(f"Full Training IoU: {full_train_iou:.4f}")
-        print(f"Cross-Validation IoU: {cv_mean_iou:.4f} ± {cv_std_iou:.4f}")
-        
-        # Plot comparison
-        plt.figure(figsize=(10, 6))
-        
-        # Plot IoU comparison
-        plt.bar([0, 1], [full_train_iou, cv_mean_iou], 
-                yerr=[0, cv_std_iou], capsize=10, color=['blue', 'green'])
-        
-        plt.xticks([0, 1], ['Full Training', 'Cross-Validation'])
-        plt.ylabel('IoU Score')
-        plt.title(f'{config["name"]} - Performance Comparison')
-        plt.grid(axis='y', linestyle='--', alpha=0.7)
-        
-        # Add text labels
-        plt.text(0, full_train_iou/2, f"{full_train_iou:.4f}", 
-                ha='center', va='center', color='white', fontweight='bold')
-        plt.text(1, cv_mean_iou/2, f"{cv_mean_iou:.4f} ± {cv_std_iou:.4f}", 
-                ha='center', va='center', color='white', fontweight='bold')
-        
-        plt.tight_layout()
-        plt.savefig(f"{save_dir}/comparison.png", dpi=200)
-        plt.show()
-        
+    # PART 2: Perform cross-validation with the same configuration
+    print("\n=== Performing Cross-Validation ===\n")
+    
+    # Number of folds
+    n_splits = 5
+    
+    # Run cross-validation
+    cv_results = cross_validate(
+        model_class=UNetWithBackbone,
+        config=config,
+        data_dir=data_dir,
+        n_splits=n_splits
+    )
+    
+    # Save cross-validation results
+    torch.save(cv_results, f"{save_dir}/cv_results.pth")
+    
+    # Compare full training vs cross-validation
+    full_train_iou = full_train_result['test_metrics'][-1]['iou']
+    cv_mean_iou = cv_results['cv_summary']['iou_mean']
+    cv_std_iou = cv_results['cv_summary']['iou_std']
+    
+    print("\n=== Results Comparison ===")
+    print(f"Full Training IoU: {full_train_iou:.4f}")
+    print(f"Cross-Validation IoU: {cv_mean_iou:.4f} ± {cv_std_iou:.4f}")
+    
+    # Plot comparison
+    plt.figure(figsize=(10, 6))
+    
+    # Plot IoU comparison
+    plt.bar([0, 1], [full_train_iou, cv_mean_iou], 
+            yerr=[0, cv_std_iou], capsize=10, color=['blue', 'green'])
+    
+    plt.xticks([0, 1], ['Full Training', 'Cross-Validation'])
+    plt.ylabel('IoU Score')
+    plt.title(f'{config["name"]} - Performance Comparison')
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    
+    # Add text labels
+    plt.text(0, full_train_iou/2, f"{full_train_iou:.4f}", 
+             ha='center', va='center', color='white', fontweight='bold')
+    plt.text(1, cv_mean_iou/2, f"{cv_mean_iou:.4f} ± {cv_std_iou:.4f}", 
+             ha='center', va='center', color='white', fontweight='bold')
+    
+    plt.tight_layout()
+    plt.savefig(f"{save_dir}/comparison.png", dpi=200)
+    plt.show()
+    
     print(f"\nExperiment completed. All results saved to {save_dir}")
 
 if __name__ == "__main__":

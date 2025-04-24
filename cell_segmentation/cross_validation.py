@@ -299,6 +299,12 @@ def cross_validate(model_class, config, data_dir, n_splits=5):
                 best_model_state = copy.deepcopy(model.state_dict())
                 best_epoch = epoch
                 print(f"Saved new best model with IoU: {best_iou:.4f}")
+            
+            # Early stopping: stop hvis vi ikke ser forbedring efter 'patience' epochs
+            patience = config.get('early_stopping_patience', 10)
+            if (epoch - best_epoch) >= patience:
+                print(f"Early stopping triggered at epoch {epoch+1}")
+                break
         
         # Training complete for this fold
         time_elapsed = time.time() - start_time
