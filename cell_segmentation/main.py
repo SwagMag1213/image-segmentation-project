@@ -3,6 +3,7 @@ import torch
 import matplotlib.pyplot as plt
 import numpy as np
 from datetime import datetime
+import time
 
 # Import from our modular framework
 from dataset import prepare_augmented_data
@@ -17,13 +18,13 @@ from wnet import WNet  # <- NEW: W-Net
 def get_config_unet():
     """Configuration for U-Net (supervised)"""
     return {
-        'name': 'unet_2',
+        'name': 'unet_4',
         'model_type': 'unet',
         'image_type': 'W',
         'backbone': 'resnet50',
         'use_attention': False,
         'batch_size': 2,
-        'img_size': (128, 128),
+        'img_size': (256, 256),
         'num_epochs': 50,
         'learning_rate': 1e-4,
         'weight_decay': 1e-5,
@@ -67,6 +68,9 @@ def get_config_wnet_unsupervised():
 
 
 def main():
+    # Start timer
+    start_time = time.time()
+    
     # Create timestamp for the experiment
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     
@@ -214,7 +218,14 @@ def main():
     plt.savefig(f"{save_dir}/comparison.png", dpi=200)
     plt.show()
     
+    # Calculate and print total training time
+    total_time = time.time() - start_time
+    minutes, seconds = divmod(total_time, 60)
+    print(f"\nTotal training time: {int(minutes)} min {int(seconds)} sec ({total_time:.1f} sec)")
     print(f"\nExperiment completed. All results saved to {save_dir}")
+    # Optionally, save time to a text file
+    with open(f"{save_dir}/summary.txt", "a") as f:
+        f.write(f"Total training time: {int(minutes)} min {int(seconds)} sec ({total_time:.1f} sec)\n")
 
 if __name__ == "__main__":
     main()
