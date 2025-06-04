@@ -18,13 +18,13 @@ from wnet import WNet  # <- NEW: W-Net
 def get_config_unet():
     """Configuration for U-Net (supervised)"""
     return {
-        'name': 'unet_4',
+        'name': 'unet_1',
         'model_type': 'unet',
         'image_type': 'W',
-        'backbone': 'resnet50',
+        'backbone': 'resnet34',
         'use_attention': False,
         'batch_size': 2,
-        'img_size': (256, 256),
+        'img_size': (128, 128),
         'num_epochs': 50,
         'learning_rate': 1e-4,
         'weight_decay': 1e-5,
@@ -36,6 +36,7 @@ def get_config_unet():
         'save_visualizations': True,
         'save_model': True,
         'loss_fn': 'dice',
+        'loss_fn': 'dice',
         'loss_alpha': 0.25,
         'focal_gamma': 2.0,
         'early_stopping_patience': 10,
@@ -46,9 +47,9 @@ def get_config_wnet_semi():
     """Configuration for W-Net (semi-supervised: seg + recon)"""
     config = get_config_unet()
     config.update({
-        'name': 'wnet_semi',
+        'name': 'semi_wnet_1',
         'model_type': 'wnet',
-        'save_dir': 'experiments/wnet_semi',
+        'save_dir': 'experiments/semi_wnet',
     })
     return config
 
