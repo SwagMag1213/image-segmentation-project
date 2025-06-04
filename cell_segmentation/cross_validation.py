@@ -13,7 +13,7 @@ import torch.nn as nn
 
 from dataset import CellSegmentationDataset
 from losses import get_loss_function
-from utils import get_device, calculate_metrics
+from utils import get_device, calculate_metrics, EarlyStopping
 from visualize import visualize_predictions
 from wnet import WNet
 
@@ -193,6 +193,12 @@ def cross_validate(model_class, config, data_dir, n_splits=5):
             optimizer, mode='max', factor=0.5, patience=5, threshold=0.01, min_lr=1e-6
         )
         
+        # Initialize EarlyStopping
+        early_stopping = EarlyStopping(
+            patience=config.get('early_stopping_patience', 10),
+            min_delta=config.get('early_stopping_min_delta', 0.001)
+        )
+
         # Setup training tracking
         train_metrics_history = []
         val_metrics_history = []
@@ -300,9 +306,8 @@ def cross_validate(model_class, config, data_dir, n_splits=5):
                 best_epoch = epoch
                 print(f"Saved new best model with IoU: {best_iou:.4f}")
             
-            # Early stopping: stop hvis vi ikke ser forbedring efter 'patience' epochs
-            patience = config.get('early_stopping_patience', 10)
-            if (epoch - best_epoch) >= patience:
+            # Check for early stopping
+            if early_stopping.step(val_metrics['iou']):
                 print(f"Early stopping triggered at epoch {epoch+1}")
                 break
         
