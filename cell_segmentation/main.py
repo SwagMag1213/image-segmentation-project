@@ -17,16 +17,16 @@ from wnet import WNet  # <- NEW: W-Net
 
 def get_config_unet():
     """Configuration for U-Net (supervised)"""
-    return {
-        'name': 'unet_4',
+    return { # attention True, resnet50
+        'name': 'unet8_resnet50_attention',
         'model_type': 'unet',
         'image_type': 'W',
-        'backbone': 'resnet34',
+        'backbone': 'resnet50',
         'use_attention': False,
         'batch_size': 2,
         'img_size': (512, 512),
         'num_epochs': 50,
-        'learning_rate': 1e-4,
+        'learning_rate': 1e-3,
         'weight_decay': 1e-5,
         'pretrained': True,
         'save_dir': 'experiments/unet',
@@ -35,6 +35,7 @@ def get_config_unet():
         'visualize_every': 10,
         'save_visualizations': True,
         'save_model': True,
+        'loss_fn': 'dice',
         'loss_fn': 'dice',
         'loss_alpha': 0.25,
         'focal_gamma': 2.0,
@@ -46,9 +47,9 @@ def get_config_wnet_semi():
     """Configuration for W-Net (semi-supervised: seg + recon)"""
     config = get_config_unet()
     config.update({
-        'name': 'wnet_semi',
+        'name': 'semi_wnet_1',
         'model_type': 'wnet',
-        'save_dir': 'experiments/wnet_semi',
+        'save_dir': 'experiments/semi_wnet',
     })
     return config
 
@@ -79,8 +80,6 @@ def main():
     config = get_config_unet()
     #config = get_config_wnet_semi()
     #config = get_config_wnet_unsupervised()
-    
-    data_dir = 'data/manual_labels'  # Update this path to your data directory
     
     # Update save directories with timestamp
     save_dir = f"{config['save_dir']}_{timestamp}"
