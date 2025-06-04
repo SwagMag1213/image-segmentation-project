@@ -18,21 +18,8 @@ from visualize import visualize_predictions
 from wnet import WNet
 
 def prepare_cross_validation_data(data_dir, image_type, n_splits=5, img_size=(256, 256), seed=42):
-    """
-    Prepare data for cross-validation while preventing data leakage
+    np.random.seed(seed)
     
-    Args:
-        data_dir: Directory containing the data
-        image_type: 'B' for fluorescent, 'W' for broadband
-        n_splits: Number of folds for cross-validation
-        img_size: Image size for resizing
-        seed: Random seed for reproducibility
-    
-    Returns:
-        dataset: The complete dataset
-        fold_indices: List of (train_indices, val_indices) tuples for each fold
-        image_groups: Dictionary mapping base image names to indices
-    """
     # Paths to augmented directories
     aug_dir = os.path.join(data_dir, f"augmented_{image_type}")
     aug_images_dir = os.path.join(aug_dir, "images")
@@ -42,7 +29,7 @@ def prepare_cross_validation_data(data_dir, image_type, n_splits=5, img_size=(25
     if not os.path.exists(aug_dir):
         raise FileNotFoundError(f"Augmented directory {aug_dir} not found.")
     
-    # Get all files from augmented dataset
+    # Get all files from augmented dataset - SORT for consistency
     all_images = sorted(os.listdir(aug_images_dir))
     
     # Store all image and mask paths
@@ -55,7 +42,7 @@ def prepare_cross_validation_data(data_dir, image_type, n_splits=5, img_size=(25
     
     # Process all images
     for i, img in enumerate(all_images):
-        # Extract base name (part before _orig or _aug)
+        # Extract base name (part before *orig or *aug)
         if "_orig.tif" in img:
             base_name = img.split('_orig.tif')[0]
         elif "_aug" in img:
@@ -81,14 +68,32 @@ def prepare_cross_validation_data(data_dir, image_type, n_splits=5, img_size=(25
     # Create the dataset
     dataset = CellSegmentationDataset(image_paths, mask_paths, img_size=img_size)
     
-    # Set up GroupKFold to ensure augmentations from the same original image stay together
     group_kfold = GroupKFold(n_splits=n_splits)
-    fold_indices = list(group_kfold.split(np.arange(len(image_paths)), groups=groups))
+    
+    # Convert to numpy arrays for consistent behavior
+    X = np.arange(len(image_paths))
+    
+    # Get unique groups and sort them for consistent ordering
+    unique_groups = sorted(list(set(groups)))
+    
+    # Create a mapping from group names to indices for consistent ordering
+    group_to_idx = {group: idx for idx, group in enumerate(unique_groups)}
+    group_indices = np.array([group_to_idx[group] for group in groups])
+    
+    # Set random seed again right before splitting
+    np.random.seed(seed)
+    
+    # Generate fold indices with consistent group ordering
+    fold_indices = []
+    for train_idx, val_idx in group_kfold.split(X, groups=group_indices):
+        fold_indices.append((train_idx, val_idx))
     
     print(f"Prepared dataset with {len(image_paths)} images from {len(image_groups)} base images")
     print(f"Split into {n_splits} folds for cross-validation")
+    print(f"Random seed set to {seed} for reproducible splits")
     
     return dataset, fold_indices, image_groups
+
 
 def cross_validate(model_class, config, data_dir, n_splits=5):
     """

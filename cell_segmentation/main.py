@@ -16,15 +16,15 @@ from wnet import WNet  # <- NEW: W-Net
 
 def get_config_unet():
     """Configuration for U-Net (supervised)"""
-    return {
-        'name': 'unet_resnet50',
+    return { # attention True, resnet50
+        'name': 'unet8_resnet50_attention',
         'model_type': 'unet',
         'image_type': 'W',
-        'backbone': 'resnet34',
-        'use_attention': False,
+        'backbone': 'resnet50',
+        'use_attention': True,
         'batch_size': 2,
-        'img_size': (128, 128),
-        'num_epochs': 20,
+        'img_size': (256, 256),
+        'num_epochs': 50,
         'learning_rate': 1e-3,
         'weight_decay': 1e-5,
         'pretrained': True,
@@ -72,9 +72,9 @@ def main():
     
     # Get configuration
 
-    #config = get_config_unet()
+    config = get_config_unet()
     #config = get_config_wnet_semi()
-    config = get_config_wnet_unsupervised()
+    #config = get_config_wnet_unsupervised()
     
     # Update save directories with timestamp
     save_dir = f"{config['save_dir']}_{timestamp}"
