@@ -18,6 +18,14 @@ class DiceLoss(nn.Module):
         dice = (2. * intersection + self.smooth) / (union + self.smooth)
         return 1 - dice
 
+class BCELoss(nn.Module):
+    """Standalone BCE Loss"""
+    def __init__(self):
+        super(BCELoss, self).__init__()
+        
+    def forward(self, pred, target):
+        return F.binary_cross_entropy_with_logits(pred, target)
+
 class ComboLoss(nn.Module):
     def __init__(self, alpha=0.5, smooth=1.0):
         super(ComboLoss, self).__init__()
@@ -47,6 +55,40 @@ class FocalLoss(nn.Module):
             return focal_loss.sum()
         else:
             return focal_loss
+
+class TripleComboLoss(nn.Module):
+    """Combination of Dice, BCE, and Focal Loss"""
+    def __init__(self, alpha_dice=0.33, alpha_bce=0.33, alpha_focal=0.34, 
+                 focal_alpha=0.25, gamma=2.0, smooth=1.0):
+        super(TripleComboLoss, self).__init__()
+        self.alpha_dice = alpha_dice
+        self.alpha_bce = alpha_bce
+        self.alpha_focal = alpha_focal
+        
+        self.dice_loss = DiceLoss(smooth=smooth)
+        self.bce_loss = BCELoss()
+        self.focal_loss = FocalLoss(alpha=focal_alpha, gamma=gamma)
+        
+    def forward(self, pred, target):
+        dice = self.dice_loss(pred, target)
+        bce = self.bce_loss(pred, target)
+        focal = self.focal_loss(pred, target)
+        
+        return (self.alpha_dice * dice + 
+                self.alpha_bce * bce + 
+                self.alpha_focal * focal)
+
+class FocalDiceComboLoss(nn.Module):
+    def __init__(self, alpha=0.5, focal_alpha=0.25, gamma=2.0, smooth=1.0):
+        super(FocalDiceComboLoss, self).__init__()
+        self.alpha = alpha
+        self.focal_loss = FocalLoss(alpha=focal_alpha, gamma=gamma, reduction='mean')
+        self.dice_loss = DiceLoss(smooth=smooth)
+    
+    def forward(self, pred, target):
+        focal = self.focal_loss(pred, target)
+        dice = self.dice_loss(pred, target)
+        return self.alpha * focal + (1 - self.alpha) * dice
 
 class TverskyLoss(nn.Module):
     def __init__(self, alpha=0.5, beta=0.5, smooth=1.0):
@@ -97,7 +139,7 @@ class BoundaryLoss(nn.Module):
         weighted_bce = (weight_map * bce).mean()
         
         return weighted_bce
-    
+
 class SoftNCutLoss(nn.Module):
     def __init__(self, img_size=(256, 256), radius=5, ox=4, oi=10):
         super().__init__()
@@ -156,20 +198,37 @@ class SoftNCutLoss(nn.Module):
 
 def get_loss_function(config):
     """Initialize the appropriate loss function based on config"""
-    if config['loss_fn'] == 'combo':
+    loss_name = config['loss_fn']
+    
+    if loss_name == 'dice':
+        return DiceLoss(smooth=config.get('smooth', 1.0))
+    elif loss_name == 'bce':
+        return BCELoss()
+    elif loss_name == 'combo':
         return ComboLoss(alpha=config.get('loss_alpha', 0.5))
-    elif config['loss_fn'] == 'focal':
-        return FocalLoss(alpha=config.get('loss_alpha', 0.25), 
+    elif loss_name == 'focal':
+        return FocalLoss(alpha=config.get('focal_alpha', 0.25), 
                         gamma=config.get('focal_gamma', 2.0))
-    elif config['loss_fn'] == 'tversky':
-        return TverskyLoss(alpha=config.get('loss_alpha', 0.5),
-                          beta=config.get('loss_beta', 0.5))
-    elif config['loss_fn'] == 'boundary':
+    elif loss_name == 'triple_combo':
+        return TripleComboLoss(
+            alpha_dice=config.get('alpha_dice', 0.33),
+            alpha_bce=config.get('alpha_bce', 0.33),
+            alpha_focal=config.get('alpha_focal', 0.34),
+            focal_alpha=config.get('focal_alpha', 0.25),
+            gamma=config.get('focal_gamma', 2.0)
+        )
+    elif loss_name == 'tversky':
+        return TverskyLoss(alpha=config.get('tversky_alpha', 0.5),
+                          beta=config.get('tversky_beta', 0.5))
+    elif loss_name == 'tversky_balanced':
+        return TverskyLoss(alpha=0.5, beta=0.5)  # Balanced version
+    elif loss_name == 'tversky_recall':
+        return TverskyLoss(alpha=0.3, beta=0.7)  # Favor recall
+    elif loss_name == 'boundary':
         return BoundaryLoss(theta0=config.get('boundary_theta0', 3),
                            theta=config.get('boundary_theta', 5))
-    elif config['loss_fn'] == 'dice':
-        return DiceLoss(smooth=config.get('smooth', 1.0))
-    elif config['loss_fn'] == 'softncut':
+    elif loss_name == 'softncut':
         return SoftNCutLoss(img_size=config.get('img_size', (256, 256)))
     else:
+        # Default to ComboLoss
         return ComboLoss(alpha=config.get('loss_alpha', 0.5))
