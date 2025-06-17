@@ -379,7 +379,7 @@ def main():
     }
     
     # Augmentation amounts to test
-    augmentation_amounts = [0, 1, 2]
+    augmentation_amounts = []
     
     # Create save directory
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
