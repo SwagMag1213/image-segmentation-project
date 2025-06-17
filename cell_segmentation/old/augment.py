@@ -163,7 +163,7 @@ def create_augmented_dataset(data_dir, image_type='both', aug_per_image=5):
 
 if __name__ == "__main__":
     # Define data directory
-    data_dir = 'data/manual_labels'  # Update this path to your data directory
+    data_dir = 'manual_labels'  # Update this path to your data directory
     
     # Create augmented dataset for both image types
     create_augmented_dataset(data_dir, image_type='both', aug_per_image=5)

@@ -1,12 +1,24 @@
+"""
+Simplified Dataset Module for Cell Segmentation
+Just the dataset class and simple data loading functions
+"""
+
 import os
 import cv2
 import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
-from sklearn.model_selection import train_test_split
+from typing import List, Tuple, Dict
+import albumentations as A
+import tempfile
+import shutil
+
 
 class CellSegmentationDataset(Dataset):
-    def __init__(self, image_paths, mask_paths, img_size=(256, 256), normalize=True):
+    """Dataset class for cell segmentation with microscopy normalization."""
+    
+    def __init__(self, image_paths: List[str], mask_paths: List[str], 
+                 img_size: Tuple[int, int] = (256, 256), normalize: bool = True):
         self.image_paths = image_paths
         self.mask_paths = mask_paths
         self.img_size = img_size
@@ -16,8 +28,8 @@ class CellSegmentationDataset(Dataset):
         return len(self.image_paths)
     
     def normalize_microscopy_image(self, image):
-        """Apply advanced normalization for microscopy images"""
-        # First, remove outliers by clipping extreme values
+        """Apply advanced normalization for microscopy images."""
+        # Remove outliers by clipping extreme values
         p_low, p_high = np.percentile(image, [2, 98])
         image_clipped = np.clip(image, p_low, p_high)
         
@@ -27,7 +39,6 @@ class CellSegmentationDataset(Dataset):
         
         # Normalize to [0, 1] range
         image_norm = (image_clahe - image_clahe.min()) / (image_clahe.max() - image_clahe.min() + 1e-8)
-        
         return image_norm
     
     def __getitem__(self, idx):
@@ -39,11 +50,10 @@ class CellSegmentationDataset(Dataset):
         image = cv2.resize(image, self.img_size, interpolation=cv2.INTER_AREA)
         mask = cv2.resize(mask, self.img_size, interpolation=cv2.INTER_NEAREST)
         
-        # Apply advanced normalization if enabled
+        # Apply normalization
         if self.normalize:
             image = self.normalize_microscopy_image(image)
         else:
-            # Basic normalization to [0, 1] range
             image = image.astype(np.float32) / 255.0
         
         # Ensure mask is binary (0 or 1)
@@ -54,71 +64,32 @@ class CellSegmentationDataset(Dataset):
         mask = torch.from_numpy(mask).unsqueeze(0)
         
         return image, mask
-    
-class CellSegmentationDatasetUnlabelled(Dataset):
-    def __init__(self, image_paths, img_size=(256, 256), normalize=True):
-        self.image_paths = image_paths
-        self.img_size = img_size
-        self.normalize = normalize
 
-    def normalize_microscopy_image(self, image):
-        # Remove outliers by clipping
-        p_low, p_high = np.percentile(image, [2, 98])
-        image_clipped = np.clip(image, p_low, p_high)
-        
-        # Apply CLAHE for local contrast enhancement
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-        image_clahe = clahe.apply(image_clipped.astype(np.uint8))
-        
-        # Normalize to [0, 1]
-        image_norm = (image_clahe - image_clahe.min()) / (image_clahe.max() - image_clahe.min() + 1e-8)
-        return image_norm
 
-    def __len__(self):
-        return len(self.image_paths)
-    
-    def __getitem__(self, idx):
-        # Load the image in grayscale
-        image = cv2.imread(self.image_paths[idx], cv2.IMREAD_GRAYSCALE)
-        # Resize image to specified size
-        image = cv2.resize(image, self.img_size, interpolation=cv2.INTER_AREA)
-        
-        # Apply normalization
-        if self.normalize:
-            image = self.normalize_microscopy_image(image)
-        else:
-            image = image.astype(np.float32) / 255.0
-        
-        # Convert image to tensor (adds channel dimension)
-        image = torch.from_numpy(image.astype(np.float32)).unsqueeze(0)
-        return image
-
-def prepare_data(data_dir, image_type='both', test_size=0.2, batch_size=2, seed=42, img_size=(256, 256)):
+def load_original_data(data_dir: str = "manual_labels", image_type: str = 'W') -> Dict:
     """
-    Prepare data for training and testing.
+    Load original (non-augmented) data paths.
     
     Args:
-        data_dir: Path to manual_labels directory
-        image_type: 'B' for fluorescent, 'W' for broadband, or 'both'
-        test_size: Fraction of data to use for testing
-        batch_size: Batch size for dataloaders
-        seed: Random seed for reproducibility
+        data_dir: Directory containing Labelled_images and GT_masks
+        image_type: 'B' for fluorescent, 'W' for broadband
+        
+    Returns:
+        Dictionary with image_paths and mask_paths lists
     """
-    # Paths to directories
-    masks_dir = os.path.join(data_dir, "GT_masks")
     images_dir = os.path.join(data_dir, "Labelled_images")
+    masks_dir = os.path.join(data_dir, "GT_masks")
     
-    # Get all files
+    if not os.path.exists(images_dir) or not os.path.exists(masks_dir):
+        raise FileNotFoundError(f"Data directories not found in {data_dir}")
+    
     all_masks = sorted(os.listdir(masks_dir))
     all_images = sorted(os.listdir(images_dir))
     
-    # Store matching image/mask pairs
     image_paths = []
     mask_paths = []
     
-    # Find matching pairs
     for mask_file in all_masks:
-        # Check if mask file ends with GT.tif
         if not mask_file.endswith('GT.tif'):
             continue
         
@@ -126,190 +97,121 @@ def prepare_data(data_dir, image_type='both', test_size=0.2, batch_size=2, seed=
         parts = mask_file.split('_')
         img_type = parts[3][1]  # 1B or 1W
         
-        # Filter by image type if specified
-        if image_type != 'both' and img_type != image_type:
+        if img_type != image_type:
             continue
         
         # Find corresponding original image
         original_file = mask_file[:-7] + '.tif'  # Replace _GT.tif with .tif
         
         if original_file in all_images:
-            image_paths.append(os.path.join(images_dir, original_file))
-            mask_paths.append(os.path.join(masks_dir, mask_file))
-    
-    # Print dataset statistics
-    print(f"Found {len(image_paths)} images with matching ground truth masks")
-    if image_type == 'both':
-        b_count = sum(1 for path in image_paths if '_1B.' in path)
-        w_count = sum(1 for path in image_paths if '_1W.' in path)
-        print(f"  - {b_count} fluorescent (B) images for NK cells")
-        print(f"  - {w_count} broadband (W) images for cancer cells")
-    
-    # Split into train and test sets
-    train_img_paths, test_img_paths, train_mask_paths, test_mask_paths = train_test_split(
-        image_paths, mask_paths, test_size=test_size, random_state=seed
-    )
-    
-    print(f"Training set: {len(train_img_paths)} images")
-    print(f"Test set: {len(test_img_paths)} images")
-    
-    # Create datasets
-    train_dataset = CellSegmentationDataset(train_img_paths, train_mask_paths, img_size=img_size)
-    test_dataset = CellSegmentationDataset(test_img_paths, test_mask_paths, img_size=img_size)
-    
-    # Create data loaders
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-    
-    return train_loader, test_loader
-
-def prepare_augmented_data(data_dir, image_type, test_size=0.2, batch_size=2, seed=42, img_size=(256, 256)):
-    """
-    Prepares augmented data while preventing data leakage between train and test sets.
-    
-    Args:
-        data_dir: Path to manual_labels directory
-        image_type: 'B' for fluorescent, 'W' for broadband
-        test_size: Fraction of data to use for testing
-        batch_size: Batch size for dataloaders
-        seed: Random seed for reproducibility
-    """
-    # Paths to augmented directories
-    aug_dir = os.path.join(data_dir, f"augmented_{image_type}")
-    aug_images_dir = os.path.join(aug_dir, "images")
-    aug_masks_dir = os.path.join(aug_dir, "masks")
-    
-    # Verify that the augmented directories exist
-    if not os.path.exists(aug_dir):
-        raise FileNotFoundError(f"Augmented directory {aug_dir} not found.")
-    
-    # Get all files from augmented dataset
-    all_images = sorted(os.listdir(aug_images_dir))
-    
-    # Group images by their base original image
-    image_groups = {}
-    for img in all_images:
-        # Extract base name (part before _orig or _aug)
-        if "_orig.tif" in img:
-            base_name = img.split('_orig.tif')[0]
-        elif "_aug" in img:
-            # Extract the base name from augmented images (everything before _aug)
-            base_name = img.split('_aug')[0]
-        else:
-            # Skip if not following expected naming convention
-            continue
-        
-        # Check if corresponding mask exists
-        mask_path = os.path.join(aug_masks_dir, img)
-        if not os.path.exists(mask_path):
-            continue
-        
-        # Add to appropriate group
-        if base_name not in image_groups:
-            image_groups[base_name] = []
-        
-        image_groups[base_name].append((
-            os.path.join(aug_images_dir, img),
-            mask_path
-        ))
-    
-    # Get the base names of all groups
-    base_names = list(image_groups.keys())
-    
-    # Split base names into train and test
-    # This is the key step - we split by base name so all related augmentations stay together
-    train_bases, test_bases = train_test_split(
-        base_names, test_size=test_size, random_state=seed
-    )
-    
-    # Create train and test sets
-    train_img_paths = []
-    train_mask_paths = []
-    test_img_paths = []
-    test_mask_paths = []
-    
-    # Add all images from training base names to train set
-    for base in train_bases:
-        for img_path, mask_path in image_groups[base]:
-            train_img_paths.append(img_path)
-            train_mask_paths.append(mask_path)
-    
-    # Add all images from test base names to test set
-    for base in test_bases:
-        for img_path, mask_path in image_groups[base]:
-            test_img_paths.append(img_path)
-            test_mask_paths.append(mask_path)
-    
-    # Print dataset statistics
-    print(f"Found {len(base_names)} original base images with augmentations")
-    print(f"Training set: {len(train_img_paths)} images from {len(train_bases)} base images")
-    print(f"Test set: {len(test_img_paths)} images from {len(test_bases)} base images")
-    
-    # Create datasets
-    train_dataset = CellSegmentationDataset(train_img_paths, train_mask_paths, img_size=img_size)
-    test_dataset = CellSegmentationDataset(test_img_paths, test_mask_paths, img_size=img_size)
-    
-    # Create data loaders
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-    
-    return train_loader, test_loader
-
-def prepare_all_labeled_data(data_dir="manual_labels", image_type='both', img_size=(256, 256), batch_size=2):
-    # Paths to augmented directories
-    aug_dir = os.path.join(data_dir, f"augmented_{image_type}")
-    images_dir = os.path.join(aug_dir, "images")
-    masks_dir = os.path.join(aug_dir, "masks")
-    
-    # Verify that the augmented directories exist
-    if not os.path.exists(aug_dir):
-        raise FileNotFoundError(f"Augmented directory {aug_dir} not found.")
-    
-    all_files = sorted(os.listdir(images_dir))
-    
-    image_paths = []
-    mask_paths = []
-    
-    for file in all_files:
-        # Assumes the naming convention ensures that an image has a corresponding mask with the same filename in masks_dir.
-        image_path = os.path.join(images_dir, file)
-        mask_path = os.path.join(masks_dir, file)
-        
-        if os.path.exists(mask_path):
-            image_paths.append(image_path)
+            img_path = os.path.join(images_dir, original_file)
+            mask_path = os.path.join(masks_dir, mask_file)
+            
+            image_paths.append(img_path)
             mask_paths.append(mask_path)
     
-    print(f"Found {len(image_paths)} images with matching ground truth masks")
+    print(f"Loaded {len(image_paths)} original {image_type} images")
     
-    # Create the dataset and the data loader
-    dataset = CellSegmentationDataset(image_paths, mask_paths, img_size=img_size)
-    loader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
-    return loader
+    return {
+        'image_paths': image_paths,
+        'mask_paths': mask_paths
+    }
 
-def prepare_unlabelled_data(data_dir, image_type='W', img_size=(256, 256), batch_size=2):
+
+def prepare_data(image_paths: List[str], mask_paths: List[str], 
+                batch_size: int = 2, img_size: Tuple[int, int] = (256, 256),
+                shuffle: bool = True) -> DataLoader:
     """
-    Prepare data loader for unsupervised training from unlabelled data.
+    Create a DataLoader from image and mask paths.
     
     Args:
-        data_dir (str): Directory containing the 'unlabelled' folder.
-        image_type (str): '1W' to select broadband images or '1B' for fluorescent.
-        img_size (tuple): Target image size.
-        batch_size (int): Batch size for the data loader.
-        num_workers (int): Number of workers for data loading.
-    
+        image_paths: List of image file paths
+        mask_paths: List of mask file paths
+        batch_size: Batch size for DataLoader
+        img_size: Target image size (height, width)
+        shuffle: Whether to shuffle the data
+        
     Returns:
-        DataLoader: Unlabelled image loader.
+        DataLoader ready for training/evaluation
     """
-    if not os.path.exists(data_dir):
-        raise FileNotFoundError(f"Unlabelled directory not found at {data_dir}")
+    dataset = CellSegmentationDataset(image_paths, mask_paths, img_size=img_size)
+    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
+
+class CellAugmenter:
+    """Simple augmenter using the 4 best augmentations from forward selection."""
     
-    all_files = sorted(os.listdir(data_dir))
-    image_paths = [os.path.join(data_dir, f) for f in all_files 
-                   if f.endswith(".tif") and f"_1{image_type}" in f]
+    def __init__(self, augmentations_per_image: int = 3):
+        self.augmentations_per_image = augmentations_per_image
+        self.temp_dir = "temp_augmentation"  # Fixed directory name
+        
+        # Create the optimal pipeline
+        self.pipeline = A.Compose([
+            A.RandomRotate90(p=0.5),
+            A.Affine(scale=(0.95, 1.05), translate_percent=(-0.05, 0.05),
+                     rotate=(-15, 15), shear=(-5, 5), p=0.3),
+            A.VerticalFlip(p=0.5),
+            A.AdvancedBlur(blur_limit=(3, 7), p=0.3)
+        ])
     
-    print(f"Found {len(image_paths)} unlabelled {image_type} images.")
+    def augment_training_data(self, train_images: List[str], train_masks: List[str]) -> Tuple[List[str], List[str]]:
+        """
+        Augment training data and return expanded lists.
+        Returns: (all_train_images, all_train_masks) including originals + augmented
+        """
+        if self.augmentations_per_image == 0:
+            return train_images, train_masks
+        
+        # Create/clean temp directory
+        os.makedirs(self.temp_dir, exist_ok=True)
+        
+        # Start with originals
+        all_images = train_images.copy()
+        all_masks = train_masks.copy()
+        
+        # Add augmented versions
+        for img_path, mask_path in zip(train_images, train_masks):
+            image = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
+            mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
+            
+            if image is None or mask is None:
+                print(f"Warning: Could not load {img_path} or {mask_path}")
+                continue
+                
+            mask = (mask > 0).astype(np.uint8) * 255
+            
+            for i in range(self.augmentations_per_image):
+                # Apply augmentation
+                aug_result = self.pipeline(image=image, mask=mask)
+                
+                # Save augmented files
+                base_name = os.path.splitext(os.path.basename(img_path))[0]
+                aug_img_path = os.path.join(self.temp_dir, f"{base_name}_aug{i}.tif")
+                aug_mask_path = os.path.join(self.temp_dir, f"{base_name}_mask{i}.tif")
+                
+                # Ensure the images are saved successfully
+                success_img = cv2.imwrite(aug_img_path, aug_result['image'])
+                success_mask = cv2.imwrite(aug_mask_path, aug_result['mask'])
+                
+                if success_img and success_mask:
+                    all_images.append(aug_img_path)
+                    all_masks.append(aug_mask_path)
+                else:
+                    print(f"Warning: Failed to save augmented files for {base_name}")
+        
+        print(f"Training data: {len(train_images)} original + {len(all_images) - len(train_images)} augmented = {len(all_images)} total")
+        return all_images, all_masks
     
-    dataset = CellSegmentationDatasetUnlabelled(image_paths, img_size=img_size)
-    train_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-    test_loader = prepare_all_labeled_data(data_dir="manual_labels", image_type=image_type, img_size=img_size, batch_size=batch_size)
-    return train_loader, test_loader
+    def cleanup(self):
+        """Remove temporary files."""
+        if os.path.exists(self.temp_dir):
+            shutil.rmtree(self.temp_dir)
+    
+    def __enter__(self):
+        return self
+
+
+if __name__ == "__main__":
+    # Example usage
+    data = load_original_data(image_type='W')
+    loader = prepare_data(data['image_paths'], data['mask_paths'], batch_size=2)
+    print(f"Created DataLoader with {len(loader)} batches")

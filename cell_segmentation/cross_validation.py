@@ -1,480 +1,454 @@
+"""
+Simplified Cross-Validation Module
+Focused on CV only - test sets handled separately when needed
+"""
+
 import os
 import torch
 import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from sklearn.model_selection import KFold, GroupKFold
-from torch.utils.data import DataLoader, Subset
-from tqdm.auto import tqdm
-from collections import defaultdict
-import copy
 import time
-import torch.nn as nn
+from typing import List, Dict, Callable, Tuple
+from collections import defaultdict
+from sklearn.model_selection import KFold
 
-from dataset import CellSegmentationDataset
+from dataset import load_original_data
+from train import train_model
+from utils import get_device
 from losses import get_loss_function
-from utils import get_device, calculate_metrics, EarlyStopping
-from visualize import visualize_predictions
-from wnet import WNet
-
-def prepare_cross_validation_data(data_dir, image_type, n_splits=5, img_size=(256, 256), seed=42):
-    np.random.seed(seed)
-    
-    # Paths to augmented directories
-    aug_dir = os.path.join(data_dir, f"augmented_{image_type}")
-    aug_images_dir = os.path.join(aug_dir, "images")
-    aug_masks_dir = os.path.join(aug_dir, "masks")
-    
-    # Verify that the augmented directories exist
-    if not os.path.exists(aug_dir):
-        raise FileNotFoundError(f"Augmented directory {aug_dir} not found.")
-    
-    # Get all files from augmented dataset - SORT for consistency
-    all_images = sorted(os.listdir(aug_images_dir))
-    
-    # Store all image and mask paths
-    image_paths = []
-    mask_paths = []
-    groups = []  # Original image group for each augmented image
-    
-    # Dictionary to store indices by base name
-    image_groups = defaultdict(list)
-    
-    # Process all images
-    for i, img in enumerate(all_images):
-        # Extract base name (part before *orig or *aug)
-        if "_orig.tif" in img:
-            base_name = img.split('_orig.tif')[0]
-        elif "_aug" in img:
-            # Extract the base name from augmented images (everything before _aug)
-            base_name = img.split('_aug')[0]
-        else:
-            # Skip if not following expected naming convention
-            continue
-        
-        # Check if corresponding mask exists
-        mask_path = os.path.join(aug_masks_dir, img)
-        if not os.path.exists(mask_path):
-            continue
-        
-        # Add to dataset
-        image_paths.append(os.path.join(aug_images_dir, img))
-        mask_paths.append(mask_path)
-        groups.append(base_name)
-        
-        # Store index by base name
-        image_groups[base_name].append(len(image_paths) - 1)
-    
-    # Create the dataset
-    dataset = CellSegmentationDataset(image_paths, mask_paths, img_size=img_size)
-    
-    group_kfold = GroupKFold(n_splits=n_splits)
-    
-    # Convert to numpy arrays for consistent behavior
-    X = np.arange(len(image_paths))
-    
-    # Get unique groups and sort them for consistent ordering
-    unique_groups = sorted(list(set(groups)))
-    
-    # Create a mapping from group names to indices for consistent ordering
-    group_to_idx = {group: idx for idx, group in enumerate(unique_groups)}
-    group_indices = np.array([group_to_idx[group] for group in groups])
-    
-    # Set random seed again right before splitting
-    np.random.seed(seed)
-    
-    # Generate fold indices with consistent group ordering
-    fold_indices = []
-    for train_idx, val_idx in group_kfold.split(X, groups=group_indices):
-        fold_indices.append((train_idx, val_idx))
-    
-    print(f"Prepared dataset with {len(image_paths)} images from {len(image_groups)} base images")
-    print(f"Split into {n_splits} folds for cross-validation")
-    print(f"Random seed set to {seed} for reproducible splits")
-    
-    return dataset, fold_indices, image_groups
 
 
-def cross_validate(model_class, config, data_dir, n_splits=5):
-    """
-    Perform cross-validation on a model with the given configuration
+class CrossValidator:
+    """Simple cross-validation for model evaluation."""
     
-    Args:
-        model_class: Class for model initialization (e.g., UNetWithBackbone)
-        config: Configuration dictionary
-        data_dir: Directory containing the data
-        n_splits: Number of folds for cross-validation
-    
-    Returns:
-        Dictionary with cross-validation results
-    """
-    print(f"Starting {n_splits}-fold cross-validation for {config['name']}")
-    
-    # Set random seed for reproducibility
-    torch.manual_seed(config['seed'])
-    np.random.seed(config['seed'])
-    
-    # Device setup
-    device = get_device()
-    
-    # Prepare dataset for cross-validation
-    dataset, fold_indices, image_groups = prepare_cross_validation_data(
-        data_dir=data_dir,
-        image_type=config['image_type'],
-        n_splits=n_splits,
-        img_size=config['img_size'],
-        seed=config['seed']
-    )
-    
-    # Storage for fold results
-    fold_results = []
-    
-    # Metrics across all folds
-    all_val_metrics = defaultdict(list)
-    best_models = []
-    
-    # For each fold
-    for fold_idx, (train_indices, val_indices) in enumerate(fold_indices):
-        print(f"\n----- Fold {fold_idx+1}/{n_splits} -----")
+    def __init__(self, data_dir: str = "manual_labels", image_type: str = 'W',
+                 n_splits: int = 5, random_state: int = 42, 
+                 augmentations_per_image: int = 3, verbose: bool = True):
+        """
+        Initialize CV with data loading only - no train/test split.
         
-        # Create train and validation subsets
-        train_subset = Subset(dataset, train_indices)
-        val_subset = Subset(dataset, val_indices)
+        Args:
+            data_dir: Directory containing data
+            image_type: 'W' or 'B' 
+            n_splits: Number of CV folds
+            random_state: Random seed
+            augmentations_per_image: Augmentations per original image
+            verbose: Print progress
+        """
+        self.n_splits = n_splits
+        self.random_state = random_state
+        self.augmentations_per_image = augmentations_per_image
+        self.verbose = verbose
         
-        # Create data loaders
-        train_loader = DataLoader(
-            train_subset, 
-            batch_size=config['batch_size'], 
-            shuffle=True
-        )
+        # Load all data (no train/test split)
+        self.data = load_original_data(data_dir, image_type)
+        self.image_paths = self.data['image_paths']
+        self.mask_paths = self.data['mask_paths']
         
-        val_loader = DataLoader(
-            val_subset, 
-            batch_size=config['batch_size'], 
-            shuffle=False
-        )
+        if verbose:
+            print(f"Loaded {len(self.image_paths)} {image_type} images for CV")
+    
+    def create_cv_folds(self, indices: List[int] = None) -> List[Tuple[List[int], List[int]]]:
+        """
+        Create cross-validation folds.
         
-        # Initialize model
-        if config.get('model_type', 'unet') == 'wnet':
-            model = WNet(
-                n_channels=1,
-                n_classes=1,
-                backbone=config['backbone'],
-                pretrained=config['pretrained'],
-                use_attention=config['use_attention']
-            )
-            criterion_recon = nn.MSELoss()
-        else:
-            model = model_class(
-                n_classes=1, 
-                backbone=config['backbone'],
-                pretrained=config['pretrained'],
-                use_attention=config['use_attention']
-            )
-            criterion_recon = None
-
-        model = model.to(device)
+        Args:
+            indices: Specific indices to use for CV (if None, use all data)
+            
+        Returns:
+            List of (train_indices, val_indices) tuples
+        """
+        if indices is None:
+            indices = list(range(len(self.image_paths)))
         
-        # Initialize loss function
+        kfold = KFold(n_splits=self.n_splits, shuffle=True, random_state=self.random_state)
+        
+        cv_folds = []
+        for train_fold_idx, val_fold_idx in kfold.split(indices):
+            # Convert to actual indices
+            fold_train_indices = [indices[i] for i in train_fold_idx]
+            fold_val_indices = [indices[i] for i in val_fold_idx]
+            cv_folds.append((fold_train_indices, fold_val_indices))
+        
+        if self.verbose:
+            print(f"Created {self.n_splits} CV folds from {len(indices)} samples")
+        
+        return cv_folds
+    
+    def train_single_model(self, model_class: Callable, config: Dict, 
+                          train_images: List[str], train_masks: List[str],
+                          val_images: List[str], val_masks: List[str]) -> Dict:
+        """Train a single model using the train module."""
+        device = get_device()
+        
+        # Create model
+        model = model_class(
+            n_classes=1,
+            backbone=config['backbone'],
+            pretrained=config['pretrained'],
+            use_attention=config['use_attention']
+        ).to(device)
+        
+        # Setup training components
         criterion = get_loss_function(config)
-        
-        # Initialize optimizer
-        if config.get('optimizer', 'adam') == 'adam':
-            optimizer = torch.optim.Adam(
-                model.parameters(), 
-                lr=config['learning_rate'], 
-                weight_decay=config.get('weight_decay', 1e-5)
-            )
-        else:
-            optimizer = torch.optim.SGD(
-                model.parameters(), 
-                lr=config['learning_rate'], 
-                momentum=0.9,
-                weight_decay=config.get('weight_decay', 1e-5)
-            )
-        
-        # Initialize learning rate scheduler
+        optimizer = torch.optim.Adam(
+            model.parameters(),
+            lr=config['learning_rate'],
+            weight_decay=config.get('weight_decay', 1e-5)
+        )
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, mode='max', factor=0.5, patience=5, threshold=0.01, min_lr=1e-6
+            optimizer, mode='max', factor=0.5, patience=3, min_lr=1e-6
         )
         
-        # Initialize EarlyStopping
-        early_stopping = EarlyStopping(
-            patience=config.get('early_stopping_patience', 10),
-            min_delta=config.get('early_stopping_min_delta', 0.001)
+        # Make config non-verbose for CV
+        cv_config = config.copy()
+        cv_config['verbose'] = False
+        cv_config['save_plots'] = False
+        
+        # Train using the train module
+        results = train_model(
+            model=model,
+            train_images=train_images,
+            train_masks=train_masks,
+            val_images=val_images,
+            val_masks=val_masks,
+            criterion=criterion,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            num_epochs=config['num_epochs'],
+            device=device,
+            config=cv_config,
+            augmentations_per_image=self.augmentations_per_image,
+            save_plots=False
         )
-
-        # Setup training tracking
-        train_metrics_history = []
-        val_metrics_history = []
-        best_iou = 0.0
-        best_model_state = None
-        best_epoch = 0
         
-        # Training loop
-        start_time = time.time()
+        return results['final_val_metrics']
+    
+    def cross_validate_single_model(self, model_class: Callable, config: Dict, 
+                                   indices: List[int] = None) -> Dict:
+        """
+        Perform cross-validation on a single model.
         
-        for epoch in range(config['num_epochs']):
-            # Train one epoch
-            model.train()
-            epoch_loss = 0
-            train_metrics = defaultdict(float)
-            num_samples = 0
+        Args:
+            model_class: Model class to instantiate
+            config: Configuration dictionary
+            indices: Specific indices to use (if None, use all data)
             
-            for images, masks in train_loader:
-                images = images.to(device)
-                masks = masks.to(device)
-                
-                # Forward pass
-                if criterion_recon is not None:
-                    seg_output, recon_output = model(images)
-                    loss_seg = criterion(seg_output, masks)
-                    loss_recon = criterion_recon(recon_output, images)
-                    loss = loss_seg + loss_recon
-                    outputs = seg_output  # for metric evaluation
-                else:
-                    outputs = model(images)
-                    loss = criterion(outputs, masks)
-                
-                # Backward pass and optimization
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-                
-                # Calculate metrics
-                with torch.no_grad():
-                    batch_metrics = calculate_metrics(torch.sigmoid(outputs), masks)
-                    batch_size = images.size(0)
-                    
-                    for k, v in batch_metrics.items():
-                        train_metrics[k] += v * batch_size
-                    
-                    num_samples += batch_size
-                    epoch_loss += loss.item() * batch_size
-            
-            # Normalize train metrics
-            epoch_loss /= num_samples
-            for k in train_metrics:
-                train_metrics[k] /= num_samples
-            
-            train_metrics['loss'] = epoch_loss
-            train_metrics_history.append(train_metrics)
-            
-            # Evaluate on validation set
-            model.eval()
-            val_metrics = defaultdict(float)
-            val_samples = 0
-            
-            with torch.no_grad():
-                for images, masks in val_loader:
-                    images = images.to(device)
-                    masks = masks.to(device)
-                    
-                    if criterion_recon is not None:
-                        seg_output, recon_output = model(images)
-                        loss_seg = criterion(seg_output, masks)
-                        loss_recon = criterion_recon(recon_output, images)
-                        loss = loss_seg + loss_recon
-                        outputs = seg_output  # Use segmentation output for metric evaluation
-                    else:
-                        outputs = model(images)
-                        loss = criterion(outputs, masks)
-
-                    batch_size = images.size(0)
-                    val_metrics['loss'] += loss.item() * batch_size
-                    
-                    # Calculate other metrics
-                    batch_metrics = calculate_metrics(torch.sigmoid(outputs), masks)
-                    for k, v in batch_metrics.items():
-                        val_metrics[k] += v * batch_size
-                    
-                    val_samples += batch_size
-            
-            # Normalize validation metrics
-            for k in val_metrics:
-                val_metrics[k] /= val_samples
-            
-            val_metrics_history.append(val_metrics)
-            
-            # Update learning rate
-            scheduler.step(val_metrics['iou'])
-            
-            # Print progress
-            print(f"Epoch {epoch+1}/{config['num_epochs']} - "
-                  f"Train loss: {train_metrics['loss']:.4f}, "
-                  f"Val IoU: {val_metrics['iou']:.4f}")
-            
-            # Save best model
-            if val_metrics['iou'] > best_iou:
-                best_iou = val_metrics['iou']
-                best_model_state = copy.deepcopy(model.state_dict())
-                best_epoch = epoch
-                print(f"Saved new best model with IoU: {best_iou:.4f}")
-            
-            # Check for early stopping
-            if early_stopping.step(val_metrics['iou']):
-                print(f"Early stopping triggered at epoch {epoch+1}")
-                break
+        Returns:
+            Dictionary with CV results
+        """
+        if self.verbose:
+            print(f"\nCross-validating {config.get('name', 'Model')}...")
         
-        # Training complete for this fold
-        time_elapsed = time.time() - start_time
-        print(f"Fold {fold_idx+1} training complete in {time_elapsed // 60:.0f}m {time_elapsed % 60:.0f}s")
-        print(f"Best IoU: {best_iou:.4f} at epoch {best_epoch+1}")
+        # Create CV folds
+        cv_folds = self.create_cv_folds(indices)
         
-        # Load best model
-        model.load_state_dict(best_model_state)
+        # Store results
+        fold_results = []
+        all_metrics = defaultdict(list)
         
-        # Final evaluation
-        model.eval()
-        final_metrics = defaultdict(float)
-        val_samples = 0
+        # Run each fold
+        for fold_idx, (fold_train_indices, fold_val_indices) in enumerate(cv_folds):
+            if self.verbose:
+                print(f"  Fold {fold_idx + 1}/{self.n_splits}:", end=" ")
+            
+            # Get file paths for this fold
+            fold_train_images = [self.image_paths[i] for i in fold_train_indices]
+            fold_train_masks = [self.mask_paths[i] for i in fold_train_indices]
+            fold_val_images = [self.image_paths[i] for i in fold_val_indices]
+            fold_val_masks = [self.mask_paths[i] for i in fold_val_indices]
+            
+            # Train model
+            start_time = time.time()
+            val_metrics = self.train_single_model(
+                model_class, config, fold_train_images, fold_train_masks,
+                fold_val_images, fold_val_masks
+            )
+            training_time = time.time() - start_time
+            
+            # Store results
+            val_metrics['training_time'] = training_time
+            fold_results.append(val_metrics)
+            
+            for metric, value in val_metrics.items():
+                if metric != 'training_time':
+                    all_metrics[metric].append(value)
+            
+            if self.verbose:
+                print(f"IoU: {val_metrics['iou']:.4f} ({training_time:.1f}s)")
         
-        with torch.no_grad():
-            for images, masks in val_loader:
-                images = images.to(device)
-                masks = masks.to(device)
-                
-                # Handle W-Net (segmentation + reconstruction) or U-Net
-                if criterion_recon is not None:
-                    seg_output, recon_output = model(images)
-                    outputs = seg_output
-                else:
-                    outputs = model(images)
-                
-                # Calculate metrics
-                batch_metrics = calculate_metrics(torch.sigmoid(outputs), masks)
-                batch_size = images.size(0)
-                
-                for k, v in batch_metrics.items():
-                    final_metrics[k] += v * batch_size
-                
-                val_samples += batch_size
+        # Calculate summary statistics
+        cv_summary = {}
+        for metric, values in all_metrics.items():
+            cv_summary[f'{metric}_mean'] = np.mean(values)
+            cv_summary[f'{metric}_std'] = np.std(values)
         
-        # Normalize final metrics
-        for k in final_metrics:
-            final_metrics[k] /= val_samples
+        if self.verbose:
+            mean_iou = cv_summary['iou_mean']
+            std_iou = cv_summary['iou_std']
+            print(f"  Overall: {mean_iou:.4f} ± {std_iou:.4f}")
         
-        print(f"Final metrics for fold {fold_idx+1}: {final_metrics}")
-        
-        # Save fold results
-        fold_result = {
-            'fold': fold_idx + 1,
-            'train_metrics': train_metrics_history,
-            'val_metrics': val_metrics_history,
-            'best_iou': best_iou,
-            'best_epoch': best_epoch,
-            'final_metrics': final_metrics,
-            'training_time': time_elapsed
+        return {
+            'config': config,
+            'fold_results': fold_results,
+            'cv_summary': cv_summary
         }
+    
+    def compare_multiple_models(self, model_configs: List[Tuple], 
+                               indices: List[int] = None) -> Dict:
+        """
+        Compare multiple models using cross-validation.
+        Each model is tested on the same folds for fair comparison.
         
-        # Append to results list
-        fold_results.append(fold_result)
-        best_models.append(best_model_state)
+        Args:
+            model_configs: List of (model_class, config) tuples
+            indices: Specific indices to use (if None, use all data)
+            
+        Returns:
+            Dictionary with comparison results
+        """
+        if self.verbose:
+            print(f"\nComparing {len(model_configs)} models with {self.n_splits}-fold CV...")
         
-        # Collect metrics for summary
-        for metric, value in final_metrics.items():
-            all_val_metrics[metric].append(value)
+        # Create CV folds (same for all models)
+        cv_folds = self.create_cv_folds(indices)
         
-        # Create save directory if requested
-        if config.get('save_model', False):
-            save_dir = config.get('save_dir', 'experiments')
-            os.makedirs(save_dir, exist_ok=True)
-            torch.save(best_model_state, f"{save_dir}/{config['name']}_fold{fold_idx+1}_best.pth")
-    
-    # Calculate mean and std of metrics across folds
-    cv_summary = {}
-    for metric, values in all_val_metrics.items():
-        cv_summary[f'{metric}_mean'] = np.mean(values)
-        cv_summary[f'{metric}_std'] = np.std(values)
-    
-    print("\n----- Cross-Validation Summary -----")
-    for metric, mean_value in cv_summary.items():
-        if metric.endswith('_mean'):
-            base_metric = metric[:-5]  # Remove '_mean'
-            std_value = cv_summary[f'{base_metric}_std']
-            print(f"{base_metric}: {mean_value:.4f} ± {std_value:.4f}")
-    
-    # Create plots
-    plot_cross_validation_results(fold_results, config)
-    
-    # Return results
-    cv_results = {
-        'config': config,
-        'fold_results': fold_results,
-        'cv_summary': cv_summary,
-        'best_models': best_models
-    }
-    
-    return cv_results
+        # Store results for all models
+        all_results = {}
+        comparison_summary = {}
+        
+        # Test each model
+        for model_class, config in model_configs:
+            model_name = config.get('name', 'Unknown')
+            if self.verbose:
+                print(f"\nTesting {model_name}...")
+            
+            fold_results = []
+            all_metrics = defaultdict(list)
+            
+            # Run each fold
+            for fold_idx, (fold_train_indices, fold_val_indices) in enumerate(cv_folds):
+                if self.verbose:
+                    print(f"  Fold {fold_idx + 1}/{self.n_splits}:", end=" ")
+                
+                # Get file paths for this fold
+                fold_train_images = [self.image_paths[i] for i in fold_train_indices]
+                fold_train_masks = [self.mask_paths[i] for i in fold_train_indices]
+                fold_val_images = [self.image_paths[i] for i in fold_val_indices]
+                fold_val_masks = [self.mask_paths[i] for i in fold_val_indices]
+                
+                # Train model
+                start_time = time.time()
+                val_metrics = self.train_single_model(
+                    model_class, config, fold_train_images, fold_train_masks,
+                    fold_val_images, fold_val_masks
+                )
+                training_time = time.time() - start_time
+                
+                # Store results
+                val_metrics['training_time'] = training_time
+                fold_results.append(val_metrics)
+                
+                for metric, value in val_metrics.items():
+                    if metric != 'training_time':
+                        all_metrics[metric].append(value)
+                
+                if self.verbose:
+                    print(f"IoU: {val_metrics['iou']:.4f}")
+            
+            # Calculate summary for this model
+            cv_summary = {}
+            for metric, values in all_metrics.items():
+                cv_summary[f'{metric}_mean'] = np.mean(values)
+                cv_summary[f'{metric}_std'] = np.std(values)
+            
+            # Store results
+            all_results[model_name] = {
+                'config': config,
+                'fold_results': fold_results,
+                'cv_summary': cv_summary
+            }
+            
+            # Add to comparison summary
+            comparison_summary[model_name] = cv_summary
+            
+            if self.verbose:
+                mean_iou = cv_summary['iou_mean']
+                std_iou = cv_summary['iou_std']
+                print(f"  {model_name}: {mean_iou:.4f} ± {std_iou:.4f}")
+        
+        # Print comparison summary
+        if self.verbose:
+            print(f"\n{'='*60}")
+            print("MODEL COMPARISON SUMMARY")
+            print(f"{'='*60}")
+            
+            # Sort by mean IoU
+            sorted_models = sorted(comparison_summary.items(), 
+                                 key=lambda x: x[1]['iou_mean'], reverse=True)
+            
+            for i, (model_name, summary) in enumerate(sorted_models):
+                mean_iou = summary['iou_mean']
+                std_iou = summary['iou_std']
+                print(f"{i+1:2d}. {model_name:25}: {mean_iou:.4f} ± {std_iou:.4f}")
+        
+        return {
+            'individual_results': all_results,
+            'comparison_summary': comparison_summary,
+            'cv_folds_used': len(cv_folds)
+        }
 
-def plot_cross_validation_results(fold_results, config):
-    """Plot metrics across folds"""
-    n_folds = len(fold_results)
+
+class ModelComparator:
+    """Handles model comparison with train/test splits and generalization testing."""
     
-    plt.figure(figsize=(15, 10))
+    def __init__(self, data_dir: str = "manual_labels", image_type: str = 'W',
+                 test_size: float = 0.2, n_splits: int = 5, random_state: int = 42,
+                 augmentations_per_image: int = 3, verbose: bool = True):
+        """
+        Initialize comparator with train/test split for generalization testing.
+        """
+        self.cv = CrossValidator(data_dir, image_type, n_splits, random_state, 
+                               augmentations_per_image, verbose)
+        self.test_size = test_size
+        self.random_state = random_state
+        self.verbose = verbose
+        
+        # Create train/test split
+        from sklearn.model_selection import train_test_split
+        indices = list(range(len(self.cv.image_paths)))
+        self.train_indices, self.test_indices = train_test_split(
+            indices, test_size=test_size, random_state=random_state
+        )
+        
+        if verbose:
+            print(f"Created train/test split: {len(self.train_indices)}/{len(self.test_indices)}")
     
-    # Plot training and validation IoU for each fold
-    plt.subplot(2, 2, 1)
-    for fold_idx, result in enumerate(fold_results):
-        plt.plot([m['iou'] for m in result['train_metrics']], 
-                '--', label=f'Fold {fold_idx+1} Train')
-        plt.plot([m['iou'] for m in result['val_metrics']], 
-                '-', label=f'Fold {fold_idx+1} Val')
+    def run_cv_comparison(self, model_configs: List[Tuple]) -> Dict:
+        """Run CV comparison on training set only."""
+        return self.cv.compare_multiple_models(model_configs, self.train_indices)
     
-    plt.title('IoU Across Folds')
-    plt.xlabel('Epoch')
-    plt.ylabel('IoU')
-    plt.grid(True)
-    plt.legend()
-    
-    # Plot training and validation loss for each fold
-    plt.subplot(2, 2, 2)
-    for fold_idx, result in enumerate(fold_results):
-        plt.plot([m['loss'] for m in result['train_metrics']], 
-                '--', label=f'Fold {fold_idx+1} Train')
-        plt.plot([m['loss'] for m in result['val_metrics']], 
-                '-', label=f'Fold {fold_idx+1} Val')
-    
-    plt.title('Loss Across Folds')
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.grid(True)
-    plt.legend()
-    
-    # Bar chart of best IoU for each fold
-    plt.subplot(2, 2, 3)
-    best_ious = [result['best_iou'] for result in fold_results]
-    fold_numbers = [f'Fold {i+1}' for i in range(n_folds)]
-    
-    plt.bar(fold_numbers, best_ious)
-    plt.title('Best IoU by Fold')
-    plt.ylabel('IoU')
-    plt.axhline(y=np.mean(best_ious), color='r', linestyle='-', label=f'Mean: {np.mean(best_ious):.4f}')
-    plt.legend()
-    
-    # Bar chart of final metrics across folds
-    plt.subplot(2, 2, 4)
-    metrics = ['iou', 'f1', 'precision', 'recall']
-    means = []
-    stds = []
-    
-    for metric in metrics:
-        values = [result['final_metrics'][metric] for result in fold_results]
-        means.append(np.mean(values))
-        stds.append(np.std(values))
-    
-    x = np.arange(len(metrics))
-    plt.bar(x, means, yerr=stds, capsize=5)
-    plt.xticks(x, metrics)
-    plt.title('Final Metrics (Mean ± Std)')
-    plt.ylabel('Value')
-    
-    plt.tight_layout()
-    
-    # Save figure if requested
-    if config.get('save_visualizations', False):
-        save_dir = config.get('save_dir', 'experiments')
-        os.makedirs(save_dir, exist_ok=True)
-        plt.savefig(f"{save_dir}/{config['name']}_cv_results.png", dpi=200, bbox_inches='tight')
-    
-    plt.show()
+    def evaluate_generalization(self, model_configs: List[Tuple]) -> Dict:
+        """Train on full training set and test on held-out test set."""
+        if self.verbose:
+            print(f"\n{'='*60}")
+            print("GENERALIZATION EVALUATION")
+            print(f"{'='*60}")
+        
+        device = get_device()
+        generalization_results = {}
+        
+        # Get test data
+        test_images = [self.cv.image_paths[i] for i in self.test_indices]
+        test_masks = [self.cv.mask_paths[i] for i in self.test_indices]
+        
+        for model_class, config in model_configs:
+            model_name = config.get('name', 'Unknown')
+            if self.verbose:
+                print(f"\nTraining {model_name} on full training set...")
+            
+            # Get full training data
+            train_images = [self.cv.image_paths[i] for i in self.train_indices]
+            train_masks = [self.cv.mask_paths[i] for i in self.train_indices]
+            
+            # Use train_model() which handles augmentation internally
+            start_time = time.time()
+            model = model_class(
+                n_classes=1, backbone=config['backbone'],
+                pretrained=config['pretrained'], use_attention=config['use_attention']
+            ).to(device)
+            
+            criterion = get_loss_function(config)
+            optimizer = torch.optim.Adam(
+                model.parameters(),
+                lr=config['learning_rate'],
+                weight_decay=config.get('weight_decay', 1e-5)
+            )
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+                optimizer, mode='max', factor=0.5, patience=3, min_lr=1e-6
+            )
+            
+            # Simplified config for generalization training
+            gen_config = config.copy()
+            gen_config['verbose'] = False
+            gen_config['save_plots'] = False
+            gen_config['num_epochs'] = config['num_epochs']
+            
+            # Train using train_model (handles augmentation automatically)
+            train_results = train_model(
+                model=model,
+                train_images=train_images,
+                train_masks=train_masks,
+                val_images=test_images,
+                val_masks=test_masks,
+                criterion=criterion,
+                optimizer=optimizer,
+                scheduler=scheduler,
+                num_epochs=gen_config['num_epochs'],
+                device=device,
+                config=gen_config,
+                augmentations_per_image=self.cv.augmentations_per_image,
+                save_plots=False
+            )
+            
+            training_time = time.time() - start_time
+            test_metrics = train_results['final_val_metrics']  # Fixed variable name
+            best_train_iou = train_results['best_iou']
+            
+            # Store results
+            generalization_results[model_name] = {
+                'final_train_iou': best_train_iou,
+                'test_metrics': dict(test_metrics),  # Fixed variable name
+                'training_time': training_time
+            }
+            
+            if self.verbose:
+                print(f"  Test IoU: {test_metrics['iou']:.4f}")  # Fixed variable name
+        
+        # Print summary
+        if self.verbose:
+            print(f"\n{'='*60}")
+            print("GENERALIZATION SUMMARY")
+            print(f"{'='*60}")
+            
+            sorted_results = sorted(generalization_results.items(), 
+                                  key=lambda x: x[1]['test_metrics']['iou'], reverse=True)
+            
+            for i, (model_name, results) in enumerate(sorted_results):
+                test_iou = results['test_metrics']['iou']
+                train_iou = results['final_train_iou']
+                overfitting = train_iou - test_iou
+                print(f"{i+1:2d}. {model_name:25}: Test IoU = {test_iou:.4f}, "
+                      f"Overfitting = {overfitting:.4f}")
+        
+        return generalization_results
+
+
+# Convenience functions
+def quick_cv(model_class: Callable, config: Dict, data_dir: str = "manual_labels", 
+             image_type: str = 'W', n_splits: int = 5, augmentations_per_image: int = 3) -> Dict:
+    """Quick single model cross-validation."""
+    cv = CrossValidator(data_dir=data_dir, image_type=image_type, n_splits=n_splits, 
+                       augmentations_per_image=augmentations_per_image)
+    return cv.cross_validate_single_model(model_class, config)
+
+
+def quick_model_comparison(model_configs: List[Tuple], data_dir: str = "manual_labels",
+                          image_type: str = 'W', n_splits: int = 5, 
+                          augmentations_per_image: int = 3, include_generalization: bool = False) -> Dict:
+    """Quick multi-model comparison."""
+    if include_generalization:
+        comparator = ModelComparator(data_dir=data_dir, image_type=image_type, n_splits=n_splits,
+                                   augmentations_per_image=augmentations_per_image)
+        cv_results = comparator.run_cv_comparison(model_configs)
+        gen_results = comparator.evaluate_generalization(model_configs)
+        return {'cv_results': cv_results, 'generalization_results': gen_results}
+    else:
+        cv = CrossValidator(data_dir=data_dir, image_type=image_type, n_splits=n_splits,
+                           augmentations_per_image=augmentations_per_image)
+        return cv.compare_multiple_models(model_configs)
+
+
+if __name__ == "__main__":
+    print("Cross-validation module loaded successfully!")
+    print("Use CrossValidator for simple CV on all data")
+    print("Use ModelComparator for CV + generalization testing")

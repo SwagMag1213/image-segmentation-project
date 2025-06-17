@@ -1,0 +1,44 @@
+{
+  "selected_augmentations": [
+    "horizontal_flip"
+  ],
+  "final_score": 0.6776580127243496,
+  "baseline_score": 0.5619647405291935,
+  "total_improvement": 0.11569327219515602,
+  "selection_history": [
+    {
+      "iteration": 1,
+      "selected": "horizontal_flip",
+      "current_set": [
+        "horizontal_flip"
+      ],
+      "score": 0.6776580127243496,
+      "improvement": 0.11569327219515602,
+      "candidate_scores": {
+        "horizontal_flip": 0.6776580127243496,
+        "vertical_flip": 0.6661713067283642,
+        "random_rotate_90": 0.6440270669446145
+      }
+    }
+  ],
+  "config": {
+    "name": "augmentation_selection",
+    "model_type": "unet",
+    "image_type": "W",
+    "backbone": "resnet34",
+    "use_attention": false,
+    "batch_size": 2,
+    "img_size": [
+      128,
+      128
+    ],
+    "num_epochs": 3,
+    "learning_rate": 0.001,
+    "weight_decay": 1e-05,
+    "pretrained": true,
+    "seed": 42,
+    "loss_fn": "dice",
+    "loss_alpha": 0.25,
+    "focal_gamma": 2.0
+  }
+}

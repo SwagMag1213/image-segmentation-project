@@ -651,7 +651,7 @@ def get_loss_configurations():
         'use_attention': False,
         'batch_size': 2,
         'img_size': (128, 128),
-        'num_epochs': 1,
+        'num_epochs': 2,
         'learning_rate': 1e-3,
         'weight_decay': 1e-5,
         'pretrained': True,
