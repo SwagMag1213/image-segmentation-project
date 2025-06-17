@@ -17,26 +17,25 @@ from wnet import WNet  # <- NEW: W-Net
 
 def get_config_unet():
     """Configuration for U-Net (supervised)"""
-    return { # attention True, resnet50
-        'name': 'unet8_resnet50_attention',
+    return {
+        'name': 'unet_test',
         'model_type': 'unet',
         'image_type': 'W',
-        'backbone': 'resnet50',
-        'use_attention': True,
-        'batch_size': 2,
-        'img_size': (256, 256),
+        'backbone': 'resnet34',
+        'use_attention': False,
+        'batch_size': 4,
+        'img_size': (128, 128),
         'num_epochs': 50,
-        'learning_rate': 1e-3,
+        'learning_rate': 1e-4,
         'weight_decay': 1e-5,
         'pretrained': True,
-        'save_dir': 'experiments/unet',
+        'save_dir': 'experiments/unet_baseline',
         'seed': 42,
         'optimizer': 'adam',
         'visualize_every': 10,
         'save_visualizations': True,
         'save_model': True,
-        'loss_fn': 'dice',
-        'loss_fn': 'dice',
+        'loss_fn': 'focal',
         'loss_alpha': 0.25,
         'focal_gamma': 2.0,
         'early_stopping_patience': 10,
@@ -47,9 +46,9 @@ def get_config_wnet_semi():
     """Configuration for W-Net (semi-supervised: seg + recon)"""
     config = get_config_unet()
     config.update({
-        'name': 'semi_wnet_1',
+        'name': 'wnet_semi',
         'model_type': 'wnet',
-        'save_dir': 'experiments/semi_wnet',
+        'save_dir': 'experiments/wnet_semi',
     })
     return config
 
@@ -80,6 +79,8 @@ def main():
     config = get_config_unet()
     #config = get_config_wnet_semi()
     #config = get_config_wnet_unsupervised()
+    
+    data_dir = 'data/manual_labels'  # Update this path to your data directory
     
     # Update save directories with timestamp
     save_dir = f"{config['save_dir']}_{timestamp}"
@@ -225,6 +226,10 @@ def main():
     # Optionally, save time to a text file
     with open(f"{save_dir}/summary.txt", "a") as f:
         f.write(f"Total training time: {int(minutes)} min {int(seconds)} sec ({total_time:.1f} sec)\n")
+
+    # Gem den trænede model (vælg evt. bedste epoch baseret på val_loss eller val_IoU)
+    torch.save(model.state_dict(), f"{save_dir}/baseline_model.pth")
+    print("Model saved as baseline_model.pth")
 
 if __name__ == "__main__":
     main()
