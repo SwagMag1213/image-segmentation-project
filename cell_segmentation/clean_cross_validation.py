@@ -651,13 +651,13 @@ def get_loss_configurations():
         'use_attention': False,
         'batch_size': 2,
         'img_size': (128, 128),
-        'num_epochs': 1,
+        'num_epochs': 100,
         'learning_rate': 1e-3,
         'weight_decay': 1e-5,
         'pretrained': True,
         'seed': 42,
         'image_type': 'W',
-        'early_stopping_patience': 3,
+        'early_stopping_patience': 5,
         'early_stopping_min_delta': 0.001,
     }
     
@@ -677,7 +677,7 @@ def main():
     save_dir = f"experiments/improved_loss_comparison_{timestamp}"
 
     os.makedirs(save_dir, exist_ok=True)
-    data_dir = "manual_labels"
+    data_dir = "data/manual_labels"
     
     print("="*80)
     print("IMPROVED LOSS FUNCTION COMPARISON EXPERIMENT")

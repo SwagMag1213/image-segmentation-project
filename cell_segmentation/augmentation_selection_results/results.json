@@ -1,0 +1,149 @@
+{
+  "selected_augmentations": [
+    "random_rotate_90",
+    "affine",
+    "vertical_flip",
+    "advanced_blur"
+  ],
+  "final_score": 0.8482266936801133,
+  "baseline_score": 0.8080930377768594,
+  "total_improvement": 0.040133655903253906,
+  "selection_history": [
+    {
+      "iteration": 1,
+      "selected": "random_rotate_90",
+      "current_set": [
+        "random_rotate_90"
+      ],
+      "score": 0.8399657094778888,
+      "improvement": 0.031872671701029476,
+      "candidate_scores": {
+        "horizontal_flip": 0.8292361673689018,
+        "affine": 0.836635710462693,
+        "random_rotate_90": 0.8399657094778888,
+        "transpose": 0.8287001259334135,
+        "grid_distortion": 0.8382819483032891,
+        "vertical_flip": 0.8328281686666751,
+        "optical_distortion": 0.8320310347352841,
+        "gauss_noise": 0.7835485360486438,
+        "invert": 0.7914234787492043,
+        "solarize": 0.7760431436178171,
+        "random_gamma": 0.809732652437738,
+        "color_jitter": 0.8155057160713505,
+        "advanced_blur": 0.8199835586927008,
+        "downscale": 0.8132326157464855,
+        "coarse_dropout": 0.8164800466010963,
+        "grid_dropout": 0.8147317065444867,
+        "random_crop": 0.7640594835741977,
+        "crop_and_pad": 0.8250704625736495
+      }
+    },
+    {
+      "iteration": 2,
+      "selected": "affine",
+      "current_set": [
+        "random_rotate_90",
+        "affine"
+      ],
+      "score": 0.8449564722888843,
+      "improvement": 0.004990762810995419,
+      "candidate_scores": {
+        "horizontal_flip": 0.8434210202099144,
+        "affine": 0.8449564722888843,
+        "transpose": 0.840542897602956,
+        "grid_distortion": 0.842272774145122,
+        "vertical_flip": 0.8427296672025699,
+        "optical_distortion": 0.8341530705576967,
+        "gauss_noise": 0.7881887284662948,
+        "invert": 0.8172255513253116,
+        "solarize": 0.7866183164178676,
+        "random_gamma": 0.836750395993087,
+        "color_jitter": 0.8348294804366327,
+        "advanced_blur": 0.8303281971688884,
+        "downscale": 0.8199150944679605,
+        "coarse_dropout": 0.824938019567528,
+        "grid_dropout": 0.8367769735890879,
+        "random_crop": 0.7754450997816363,
+        "crop_and_pad": 0.8304216134443746
+      }
+    },
+    {
+      "iteration": 3,
+      "selected": "vertical_flip",
+      "current_set": [
+        "random_rotate_90",
+        "affine",
+        "vertical_flip"
+      ],
+      "score": 0.8476185826732751,
+      "improvement": 0.0026621103843907923,
+      "candidate_scores": {
+        "horizontal_flip": 0.8427792495477018,
+        "transpose": 0.8402207394098739,
+        "grid_distortion": 0.8445227540380422,
+        "vertical_flip": 0.8476185826732751,
+        "optical_distortion": 0.8319274234178741,
+        "gauss_noise": 0.8018146554376617,
+        "invert": 0.8183160688378877,
+        "solarize": 0.7982278224470666,
+        "random_gamma": 0.8410031688558058,
+        "color_jitter": 0.842149749131173,
+        "advanced_blur": 0.8452799416353756,
+        "downscale": 0.8263230698900724,
+        "coarse_dropout": 0.8274614411833668,
+        "grid_dropout": 0.8443628137423743,
+        "random_crop": 0.7856908340954312,
+        "crop_and_pad": 0.8269639281059672
+      }
+    },
+    {
+      "iteration": 4,
+      "selected": "advanced_blur",
+      "current_set": [
+        "random_rotate_90",
+        "affine",
+        "vertical_flip",
+        "advanced_blur"
+      ],
+      "score": 0.8482266936801133,
+      "improvement": 0.000608111006838219,
+      "candidate_scores": {
+        "horizontal_flip": 0.8452623401248337,
+        "transpose": 0.8382574329702913,
+        "grid_distortion": 0.841505369728763,
+        "optical_distortion": 0.8358492670033768,
+        "gauss_noise": 0.7946748533912557,
+        "invert": 0.8252490555673769,
+        "solarize": 0.7937838875575126,
+        "random_gamma": 0.8435937060155586,
+        "color_jitter": 0.8442398499019932,
+        "advanced_blur": 0.8482266936801133,
+        "downscale": 0.826961176604086,
+        "coarse_dropout": 0.8321146670461735,
+        "grid_dropout": 0.8446290681499056,
+        "random_crop": 0.7731147120856546,
+        "crop_and_pad": 0.8274685618143863
+      }
+    }
+  ],
+  "config": {
+    "name": "augmentation_selection",
+    "model_type": "unet",
+    "image_type": "W",
+    "backbone": "resnet34",
+    "use_attention": false,
+    "batch_size": 2,
+    "img_size": [
+      128,
+      128
+    ],
+    "num_epochs": 25,
+    "learning_rate": 0.001,
+    "weight_decay": 1e-05,
+    "pretrained": true,
+    "seed": 42,
+    "loss_fn": "focal",
+    "focal_alpha": 0.25,
+    "focal_gamma": 2.0
+  }
+}
