@@ -673,8 +673,8 @@ def run_augmentation_selection_experiment():
     results = selector.run_forward_selection(verbose=True)
     
     # Save results
-    os.makedirs('augmentation_selection_results', exist_ok=True)
-    with open('augmentation_selection_results/results.json', 'w') as f:
+    os.makedirs('experiments/augmentation_selection_results', exist_ok=True)
+    with open('experiments/augmentation_selection_results/results.json', 'w') as f:
         json.dump(results, f, indent=2, default=str)
     
     # Create optimal pipeline for production

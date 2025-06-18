@@ -351,6 +351,13 @@ class AugmentationAmountExperiment:
 
 def main():
     """Main function to run augmentation amount experiment."""
+    # Set random seeds for reproducibility
+    import random
+    random.seed(42)
+    np.random.seed(42)
+    torch.manual_seed(42)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(42)
     
     # Configuration
     base_config = {
@@ -410,13 +417,5 @@ def main():
 
 
 if __name__ == "__main__":
-    # Set random seeds for reproducibility
-    import random
-    random.seed(42)
-    np.random.seed(42)
-    torch.manual_seed(42)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed(42)
-    
     # Run the experiment
     results = main()

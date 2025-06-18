@@ -424,11 +424,17 @@ class ModelConfigurationExperiment:
 
 def main():
     """Main function to run model configuration experiment."""
+    import random
+    random.seed(42)
+    np.random.seed(42)
+    torch.manual_seed(42)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(42)
     
     # Base configuration (fixed parameters)
     base_config = {
         'name': 'Model Configuration Test',
-        'num_epochs': 50,  # Reduced for faster testing
+        'num_epochs': 2,  # Reduced for faster testing
         'learning_rate': 1e-3,
         'weight_decay': 1e-8,
         'pretrained': True,
@@ -443,7 +449,7 @@ def main():
         'test_size': 0.3,
         'n_splits': 5,
         'random_state': 42,
-        'augmentations_per_image': 3,
+        'augmentations_per_image': 10,
         'img_size': (128, 128),  # Fixed image size
         
         # Loss configuration (use your best loss function)
@@ -491,13 +497,5 @@ def main():
 
 
 if __name__ == "__main__":
-    # Set random seeds for reproducibility
-    import random
-    random.seed(42)
-    np.random.seed(42)
-    torch.manual_seed(42)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed(42)
-    
     # Run the experiment
     results = main()
