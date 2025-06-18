@@ -1,6 +1,6 @@
 """
 Model Configuration Experiment using Modular Framework
-Tests different model configurations (backbone, attention, batch size, image size)
+Tests different model configurations (backbone, attention, batch size)
 """
 
 import os
@@ -28,8 +28,7 @@ class ModelConfigurationExperiment:
                 e.g., {
                     'backbone': ['resnet34', 'resnet50'],
                     'use_attention': [True, False],
-                    'batch_size': [2, 4],
-                    'img_size': [(128, 128), (256, 256)]
+                    'batch_size': [2, 4]
                 }
         """
         self.base_config = base_config
@@ -63,8 +62,6 @@ class ModelConfigurationExperiment:
             for option_name, value in config_params.items():
                 if option_name == 'use_attention':
                     name_parts.append(f"att_{value}")
-                elif option_name == 'img_size':
-                    name_parts.append(f"img_{value[0]}x{value[1]}")
                 elif option_name == 'batch_size':
                     name_parts.append(f"bs_{value}")
                 else:
@@ -88,6 +85,7 @@ class ModelConfigurationExperiment:
         print("MODEL CONFIGURATION EXPERIMENT")
         print(f"{'='*60}")
         print(f"Testing {len(self.model_configs)} configurations:")
+        print(f"Fixed image size: {self.base_config['img_size']}")
         
         # Create model configurations for ModelComparator
         # Each configuration uses the same model class but different parameters
@@ -330,7 +328,7 @@ class ModelConfigurationExperiment:
             plot_idx += 1
         
         # Configuration interaction heatmap (if we have exactly 2 main factors)
-        main_factors = ['backbone', 'use_attention', 'batch_size', 'img_size']
+        main_factors = ['backbone', 'use_attention', 'batch_size']
         available_factors = [f for f in main_factors if f in self.configuration_options]
         
         if len(available_factors) >= 2 and plot_idx <= 9:
@@ -430,7 +428,7 @@ def main():
     # Base configuration (fixed parameters)
     base_config = {
         'name': 'Model Configuration Test',
-        'num_epochs': 1,  # Reduced for faster testing
+        'num_epochs': 50,  # Reduced for faster testing
         'learning_rate': 1e-3,
         'weight_decay': 1e-8,
         'pretrained': True,
@@ -442,10 +440,11 @@ def main():
         # Data configuration
         'data_dir': 'manual_labels',
         'image_type': 'W',
-        'test_size': 0.2,
+        'test_size': 0.3,
         'n_splits': 5,
         'random_state': 42,
         'augmentations_per_image': 3,
+        'img_size': (128, 128),  # Fixed image size
         
         # Loss configuration (use your best loss function)
         'loss_fn': 'bce'
@@ -455,8 +454,7 @@ def main():
     configuration_options = {
         'backbone': ['resnet34', 'resnet50'],
         'use_attention': [True, False],
-        'batch_size': [2, 4],
-        'img_size': [(128, 128), (256, 256), (512, 512)]  # Removed (512, 512) for faster testing
+        'batch_size': [2, 4]
     }
     
     # Create save directory
@@ -469,6 +467,8 @@ def main():
     print(f"Testing combinations of:")
     for option, values in configuration_options.items():
         print(f"  {option}: {values}")
+    print(f"Fixed parameters:")
+    print(f"  img_size: {base_config['img_size']}")
     print(f"Total configurations: {np.prod([len(v) for v in configuration_options.values()])}")
     print(f"Results will be saved to: {save_dir}")
     print("="*60)

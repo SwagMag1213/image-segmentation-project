@@ -277,7 +277,7 @@ def main():
     # Configuration
     data_dir = "manual_labels"
     image_type = 'W'
-    n_splits = 5
+    n_splits = 4
     test_size = 0.2
     augmentations_per_image = 3
     random_state = 42
@@ -402,5 +402,156 @@ def main():
     print("Experiment completed successfully!")
 
 
+def filter_loss_functions(cv_results, gen_results, losses_to_remove):
+    """
+    Remove specified loss functions from the results
+    
+    Args:
+        cv_results: Cross-validation results dictionary
+        gen_results: Generalization results dictionary
+        losses_to_remove: List of loss function names to remove
+    
+    Returns:
+        Filtered cv_results and gen_results
+    """
+    # Filter CV results
+    filtered_cv_results = cv_results.copy()
+    
+    # Filter individual results
+    if 'individual_results' in filtered_cv_results:
+        filtered_individual = {k: v for k, v in filtered_cv_results['individual_results'].items() 
+                             if k not in losses_to_remove}
+        filtered_cv_results['individual_results'] = filtered_individual
+    
+    # Filter comparison summary
+    if 'comparison_summary' in filtered_cv_results:
+        filtered_summary = {k: v for k, v in filtered_cv_results['comparison_summary'].items() 
+                          if k not in losses_to_remove}
+        filtered_cv_results['comparison_summary'] = filtered_summary
+    
+    # Filter generalization results
+    filtered_gen_results = {k: v for k, v in gen_results.items() 
+                          if k not in losses_to_remove}
+    
+    return filtered_cv_results, filtered_gen_results
+
+def regenerate_plots(original_results_dir, losses_to_remove):
+    """
+    Load saved results, filter out specified losses, and regenerate plots
+    
+    Args:
+        original_results_dir: Directory containing the original .pth files
+        losses_to_remove: List of loss function names to remove
+    """
+    # Load saved results
+    cv_results_path = os.path.join(original_results_dir, 'cv_results.pth')
+    gen_results_path = os.path.join(original_results_dir, 'generalization_results.pth')
+    
+    if not os.path.exists(cv_results_path) or not os.path.exists(gen_results_path):
+        raise FileNotFoundError(f"Could not find result files in {original_results_dir}")
+    
+    # Load the data
+    cv_data = torch.load(cv_results_path, weights_only=False)
+    gen_data = torch.load(gen_results_path, weights_only=False)
+
+    
+    cv_results = cv_data['cv_results']
+    gen_results = gen_data['generalization_results']
+    
+    # Filter out the specified loss functions
+    filtered_cv_results, filtered_gen_results = filter_loss_functions(
+        cv_results, gen_results, losses_to_remove
+    )
+    
+    # Create new save directory
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    new_save_dir = f"{original_results_dir}_filtered_{timestamp}"
+    os.makedirs(new_save_dir, exist_ok=True)
+    
+    # Save filtered results
+    torch.save({
+        'cv_results': filtered_cv_results,
+        'configs': [c for c in cv_data.get('configs', []) 
+                   if c.get('name') not in losses_to_remove],
+        'timestamp': timestamp,
+        'filtered_losses': losses_to_remove
+    }, f"{new_save_dir}/cv_results_filtered.pth")
+    
+    torch.save({
+        'generalization_results': filtered_gen_results,
+        'configs': [c for c in gen_data.get('configs', []) 
+                   if c.get('name') not in losses_to_remove],
+        'timestamp': timestamp,
+        'filtered_losses': losses_to_remove
+    }, f"{new_save_dir}/generalization_results_filtered.pth")
+    
+    # Regenerate plots with filtered data
+    print(f"\nRegenerating plots without: {', '.join(losses_to_remove)}")
+    print(f"Saving to: {new_save_dir}")
+    
+    # Plot CV results
+    plot_cv_results(filtered_cv_results, new_save_dir)
+    
+    # Plot generalization results
+    plot_generalization_results(filtered_cv_results, filtered_gen_results, new_save_dir)
+    
+    # Print summary
+    print_filtered_summary(filtered_cv_results, filtered_gen_results, losses_to_remove)
+    
+    return new_save_dir
+
+def print_filtered_summary(cv_results, gen_results, removed_losses):
+    """Print summary of filtered results"""
+    print(f"\n{'='*80}")
+    print("FILTERED EXPERIMENT SUMMARY")
+    print(f"Removed loss functions: {', '.join(removed_losses)}")
+    print(f"{'='*80}")
+    
+    # Best by CV
+    cv_summary = cv_results['comparison_summary']
+    best_cv = max(cv_summary.items(), key=lambda x: x[1]['iou_mean'])
+    print(f"\nBest by Cross-Validation (after filtering):")
+    print(f"  {best_cv[0]}: IoU = {best_cv[1]['iou_mean']:.4f} ± {best_cv[1]['iou_std']:.4f}")
+    
+    # Best by Test
+    best_test = max(gen_results.items(), key=lambda x: x[1]['test_metrics']['iou'])
+    print(f"\nBest by Test Set Performance (after filtering):")
+    print(f"  {best_test[0]}: IoU = {best_test[1]['test_metrics']['iou']:.4f}")
+    
+    # Calculate CV-Test correlation
+    cv_ious = [cv_summary[name]['iou_mean'] for name in cv_summary.keys()]
+    test_ious = [gen_results[name]['test_metrics']['iou'] for name in cv_summary.keys()]
+    correlation = np.corrcoef(cv_ious, test_ious)[0, 1]
+    
+    print(f"\nCV-Test Correlation (after filtering): r = {correlation:.3f}")
+    
+    # Top 3 after filtering
+    print(f"\n{'='*60}")
+    print("TOP 3 LOSS FUNCTIONS AFTER FILTERING (by test performance):")
+    print(f"{'='*60}")
+    sorted_test = sorted(gen_results.items(), key=lambda x: x[1]['test_metrics']['iou'], reverse=True)
+    for i, (name, results) in enumerate(sorted_test[:3]):
+        print(f"{i+1}. {name}:")
+        print(f"   Test IoU: {results['test_metrics']['iou']:.4f}")
+        print(f"   Test F1:  {results['test_metrics']['f1']:.4f}")
+        print(f"   Overfitting: {results['final_train_iou'] - results['test_metrics']['iou']:.4f}")
+
+# Main execution
+def remove_losses():
+    # Specify the directory containing your original results
+    original_results_dir = "experiments/loss_comparison_20250616_204859"  # Update this path
+    
+    # List of loss functions to remove
+    losses_to_remove = [
+        "Tversky (Recall)",
+        "Boundary Loss",
+        "Triple Combo"
+    ]
+    
+    # Regenerate plots without these loss functions
+    new_dir = regenerate_plots(original_results_dir, losses_to_remove)
+    print(f"\nFiltered results saved to: {new_dir}")
+
 if __name__ == "__main__":
-    main()
+    remove_losses()
+    #main()
