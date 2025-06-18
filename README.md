@@ -13,7 +13,6 @@ This repository contains the code and experiments for our project on supervised 
   - [3. Loss Function Evaluation](#3-loss-function-evaluation)
   - [4. Model Configuration & Final Model Selection](#4-model-configuration--final-model-selection)
 - [Results](#results)
-- [Contact](#contact)
 
 ---
 
@@ -46,12 +45,12 @@ All main experiments can be launched from [`main.py`](main.py). Alternatively, y
 This experiment discovers the best combination of augmentations for training.
 
 ```sh
-python [main.py](http://_vscodecontentref_/3) --experiment augmentation_selection
+python main.py --experiment augmentation_selection
 ```
 
 or directly:
 ```
-python [forward_selection_integration.py](http://_vscodecontentref_/4)
+python forward_selection_integration.py
 ```
 
 ### 2. Augmentation Amount Experiment
@@ -63,7 +62,7 @@ python main.py --experiment augmentation_amount
 ```
 or directly:
 ```sh
-python cell_segmentation/augmentation_amount_experiment.py
+python augmentation_amount_experiment.py
 ```
 
 ### 3. Loss Function Evaluation
@@ -75,7 +74,7 @@ python main.py --experiment loss_function
 ```
 or directly:
 ```sh
-python cell_segmentation/loss_function_cross_validation.py
+python loss_function_cross_validation.py
 ```
 
 ### 4. Model Configuration & Final Model Selection
@@ -87,7 +86,7 @@ python main.py --experiment model_configuration
 ```
 or directly:
 ```sh
-python cell_segmentation/model_configuration_experiment.py
+python model_configuration_experiment.py
 ```
 
 ## Results
