@@ -7,6 +7,6 @@ cell_segmentation/Xcelligence_data-2/
 cell_segmentation/unlabelled/
 cell_segmentation/__pycache__/
 *.py[cod]
-
+temp_augmentation
 # macOS system file
 .DS_Store

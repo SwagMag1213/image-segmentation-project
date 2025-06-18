@@ -365,7 +365,7 @@ def main():
         'backbone': 'resnet34',
         'use_attention': False,
         'batch_size': 4,
-        'num_epochs': 1,  # Reduced for faster testing
+        'num_epochs': 50,  # Reduced for faster testing
         'img_size': (128, 128),
         'learning_rate': 1e-3,
         'weight_decay': 1e-5,
@@ -376,7 +376,7 @@ def main():
         'save_plots': False,
         
         # Data configuration
-        'data_dir': 'manual_labels',
+        'data_dir': 'data/manual_labels',
         'image_type': 'W',
         'random_state': 42,
         'n_splits': 5,  # Fixed for this experiment
@@ -386,7 +386,7 @@ def main():
     }
     
     # Augmentation amounts to test
-    augmentation_amounts = []
+    augmentation_amounts = list(range(1,51))
     
     # Create save directory
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
