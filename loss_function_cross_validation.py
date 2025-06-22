@@ -41,29 +41,19 @@ def get_loss_configurations():
         {**base_config, 'name': 'Balanced BCE', 'loss_fn': 'balanced_bce'},
         {**base_config, 'name': 'Focal Loss', 'loss_fn': 'focal', 
          'focal_alpha': 0.25, 'focal_gamma': 2.0},
-        {**base_config, 'name': 'Distance Map BCE', 'loss_fn': 'distance_map_bce', 
-         'distance_alpha': 1.0},
         
         # ============= Region-based Losses =============
         {**base_config, 'name': 'Dice Loss', 'loss_fn': 'dice', 'smooth': 1.0},
         {**base_config, 'name': 'Tversky Loss', 'loss_fn': 'tversky', 
          'tversky_alpha': 0.5, 'tversky_beta': 0.5},
-        {**base_config, 'name': 'Tversky (Recall)', 'loss_fn': 'tversky_recall'},
         {**base_config, 'name': 'Focal Tversky', 'loss_fn': 'focal_tversky', 
          'tversky_alpha': 0.5, 'tversky_beta': 0.5, 'focal_tversky_gamma': 0.75},
         {**base_config, 'name': 'Sensitivity-Specificity', 'loss_fn': 'sensitivity_specificity', 
          'sensitivity_weight': 0.5},
         {**base_config, 'name': 'Log-Cosh Dice', 'loss_fn': 'log_cosh_dice', 'smooth': 1.0},
-        
-        # ============= Boundary-based Losses =============
-        {**base_config, 'name': 'Boundary Loss', 'loss_fn': 'boundary', 
-         'boundary_theta0': 3, 'boundary_theta': 5},
-        
+
         # ============= Compound Losses =============
         {**base_config, 'name': 'Combo Loss', 'loss_fn': 'combo', 'loss_alpha': 0.5},
-        {**base_config, 'name': 'Triple Combo', 'loss_fn': 'triple_combo',
-         'alpha_dice': 0.33, 'alpha_bce': 0.33, 'alpha_focal': 0.34,
-         'focal_alpha': 0.25, 'focal_gamma': 2.0},
     ]
     
     return loss_configs
@@ -277,7 +267,7 @@ def main():
     # Configuration
     data_dir = "manual_labels"
     image_type = 'W'
-    n_splits = 4
+    n_splits = 5
     test_size = 0.2
     augmentations_per_image = 3
     random_state = 42

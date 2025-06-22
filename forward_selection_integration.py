@@ -52,7 +52,7 @@ class AugmentationSelector:
         
         # Create augmentation candidates
         self.augmentation_candidates = self._create_augmentation_candidates()
-        self.base_names = []  # Track base names for grouping
+        self.base_names = [] 
         
         # Load dataset paths once
         self._load_dataset_paths()
@@ -70,9 +70,9 @@ class AugmentationSelector:
         """
         candidates = {
             # === GEOMETRIC TRANSFORMATIONS (7) ===
-            'horizontal_flip': A.HorizontalFlip(p=1.0),  # -0.0161
+            'horizontal_flip': A.HorizontalFlip(p=1.0), 
             
-            'affine': A.Affine(  # -0.0149 (most comprehensive geometric)
+            'affine': A.Affine( 
                 scale=(0.95, 1.05),
                 translate_percent=(-0.05, 0.05),
                 rotate=(-15, 15),
@@ -82,14 +82,11 @@ class AugmentationSelector:
                 p=1.0
             ),
             
-            'random_rotate_90': A.RandomRotate90(p=1.0),  # -0.0136 (discrete rotations)
+            'random_rotate_90': A.RandomRotate90(p=1.0), 
             
-            'transpose': A.Transpose(p=1.0),  # -0.0127 (diagonal flip)
+            'transpose': A.Transpose(p=1.0), 
             
-            # Skip 'flip' - redundant with horizontal_flip + vertical_flip
-            # Skip 'rotate' - covered by affine
-            
-            'grid_distortion': A.GridDistortion(  # -0.0117 (elastic deformation)
+            'grid_distortion': A.GridDistortion( 
                 num_steps=5,
                 distort_limit=0.3,
                 interpolation=cv2.INTER_LINEAR,
@@ -97,9 +94,9 @@ class AugmentationSelector:
                 p=1.0
             ),
             
-            'vertical_flip': A.VerticalFlip(p=1.0),  # -0.0102
+            'vertical_flip': A.VerticalFlip(p=1.0),
             
-            'optical_distortion': A.OpticalDistortion(  # -0.0056 (lens-like distortion)
+            'optical_distortion': A.OpticalDistortion( 
                 distort_limit=0.5,
                 shift_limit=0.5,
                 interpolation=cv2.INTER_LINEAR,
@@ -107,7 +104,7 @@ class AugmentationSelector:
                 p=1.0
             ),
             
-            'gauss_noise': A.GaussNoise(  # -0.0099 (standard Gaussian noise)
+            'gauss_noise': A.GaussNoise( 
                 var_limit=(10.0, 50.0),
                 mean=0,
                 per_channel=True,
@@ -115,32 +112,27 @@ class AugmentationSelector:
             ),
             
             # === INTENSITY TRANSFORMATIONS (4) ===
-            'invert': A.InvertImg(p=1.0),  # -0.0104 (critical for microscopy)
+            'invert': A.InvertImg(p=1.0), 
             
-            'solarize': A.Solarize(  # -0.0087 (unique threshold effect)
+            'solarize': A.Solarize( 
                 threshold=128,
                 p=1.0
             ),
-            
-            # Skip 'random_brightness' - covered by color_jitter
-            # Skip 'hue_saturation_value' - for grayscale, only V matters (covered by gamma)
-            
-            'random_gamma': A.RandomGamma(  # -0.0052 (non-linear intensity)
+            'random_gamma': A.RandomGamma( 
                 gamma_limit=(80, 120),
                 p=1.0
             ),
             
-            'color_jitter': A.ColorJitter(  # -0.0062 (comprehensive color/brightness)
+            'color_jitter': A.ColorJitter( 
                 brightness=0.2,
                 contrast=0.2,
-                saturation=0,  # Set to 0 for grayscale
-                hue=0,         # Set to 0 for grayscale
+                saturation=0,  
+                hue=0,        
                 p=1.0
             ),
             
             # === BLUR/FILTER (1) ===
-            # Skip 'gaussian_blur' - covered by advanced_blur
-            'advanced_blur': A.AdvancedBlur(  # -0.0061 (includes Gaussian + motion blur)
+            'advanced_blur': A.AdvancedBlur(  
                 blur_limit=(3, 7),
                 sigmaX_limit=(0.2, 1.0),
                 sigmaY_limit=(0.2, 1.0),
@@ -151,7 +143,7 @@ class AugmentationSelector:
             ),
             
             # === SCALE TRANSFORMATION (1) ===
-            'downscale': A.Downscale(  # -0.0074 (resolution degradation)
+            'downscale': A.Downscale( 
                 scale_min=0.5,
                 scale_max=0.75,
                 interpolation=cv2.INTER_LINEAR,
@@ -159,7 +151,7 @@ class AugmentationSelector:
             ),
             
             # === DROPOUT METHODS (2) ===
-            'coarse_dropout': A.CoarseDropout(  # -0.0073 (rectangular dropouts)
+            'coarse_dropout': A.CoarseDropout( 
                 max_holes=8,
                 max_height=8,
                 max_width=8,
@@ -173,13 +165,13 @@ class AugmentationSelector:
             'grid_dropout': A.GridDropout(ratio=0.1, unit_size_min=4, unit_size_max=8, random_offset=True, p=0.5),
             
             # === CROPPING (2) ===
-            'random_crop': A.RandomCrop(  # -0.0087 (spatial crop)
-                height=96,  # 75% of 128
-                width=96,   # 75% of 128
+            'random_crop': A.RandomCrop( 
+                height=96,  
+                width=96,   
                 p=1.0
             ),
             
-            'crop_and_pad': A.CropAndPad(  # -0.0059 (crop with padding)
+            'crop_and_pad': A.CropAndPad( 
                 percent=(-0.1, 0.1),
                 pad_mode=cv2.BORDER_REFLECT,
                 p=1.0
@@ -207,7 +199,7 @@ class AugmentationSelector:
         
         self.image_paths = []
         self.mask_paths = []
-        self.base_names = []  # Track base names for grouping
+        self.base_names = []  
         
         # Find matching image-mask pairs (same logic as your dataset.py)
         for mask_file in all_masks:
@@ -260,19 +252,16 @@ class AugmentationSelector:
             aug = copy.deepcopy(self.augmentation_candidates[aug_name])
             
             if for_selection:
-                # For forward selection: Use p=0.7 for natural diversity
-                # Each augmentation has 70% chance to be applied
                 aug.p = 0.7
             else:
-                # For production: Use realistic probabilities
                 if aug_name in ['horizontal_flip', 'vertical_flip']:
                     aug.p = 0.5
                 elif aug_name == 'clahe':
-                    aug.p = 0.7  # Higher probability for critical microscopy enhancement
+                    aug.p = 0.7  
                 elif aug_name in ['random_rotate_90', 'transpose']:
-                    aug.p = 0.3  # Moderate for geometric
+                    aug.p = 0.3  
                 else:
-                    aug.p = 0.3  # Conservative for others
+                    aug.p = 0.3
                 
             transforms.append(aug)
         
@@ -303,19 +292,7 @@ class AugmentationSelector:
             
             # Create diverse augmented versions
             for aug_idx in range(augmentations_per_image):
-                # Option 1: Apply full pipeline (relies on p=0.7 for each transform)
-                # This is actually fine since each transform has p=0.7, creating natural diversity
                 augmented = aug_pipeline(image=image, mask=mask)
-                
-                # Option 2: Random subset strategy (if you want more control)
-                # if len(selected_augs) > 1:
-                #     # Randomly select subset of augmentations
-                #     n_augs = np.random.randint(1, len(selected_augs) + 1)
-                #     subset_augs = np.random.choice(selected_augs, n_augs, replace=False)
-                #     subset_pipeline = A.Compose(list(subset_augs))
-                #     augmented = subset_pipeline(image=image, mask=mask)
-                # else:
-                #     augmented = aug_pipeline(image=image, mask=mask)
                 
                 # Save augmented version
                 base_name = os.path.splitext(os.path.basename(img_path))[0]
@@ -442,7 +419,6 @@ class AugmentationSelector:
         else:
             print(f"\n  Testing: Baseline (no augmentation)")
         
-        # Use for_selection=True to set p=0.7 for natural diversity
         aug_pipeline = self._create_augmentation_pipeline(selected_augs, for_selection=True)
         
         # Use GroupKFold to ensure base images stay together
@@ -455,7 +431,6 @@ class AugmentationSelector:
         base_to_idx = {base: idx for idx, base in enumerate(unique_bases)}
         group_indices = np.array([base_to_idx[base] for base in self.base_names])
         
-        # Create dummy X for GroupKFold (we only care about groups)
         X = np.arange(len(self.image_paths))
         
         # Split by groups, ensuring base images stay together
@@ -665,8 +640,8 @@ def run_augmentation_selection_experiment():
         data_dir=data_dir,
         improvement_threshold=0.005,  # 0.5% improvement threshold
         max_augmentations=10,
-        cv_folds=3,
-        quick_evaluation=False  # Faster evaluation for selection
+        cv_folds=5,
+        quick_evaluation=False 
     )
     
     # Run selection

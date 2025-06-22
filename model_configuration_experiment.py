@@ -95,7 +95,7 @@ class ModelConfigurationExperiment:
         comparator = ModelComparator(
             data_dir=self.base_config['data_dir'],
             image_type=self.base_config['image_type'],
-            test_size=self.base_config.get('test_size', 0.2),
+            test_size=self.base_config.get('test_size', 0.3),
             n_splits=self.base_config.get('n_splits', 5),
             random_state=self.base_config.get('random_state', 42),
             augmentations_per_image=self.base_config.get('augmentations_per_image', 3),
@@ -425,22 +425,22 @@ class ModelConfigurationExperiment:
 def main():
     """Main function to run model configuration experiment."""
     import random
-    random.seed(42)
-    np.random.seed(42)
-    torch.manual_seed(42)
+    random.seed(41)
+    np.random.seed(41)
+    torch.manual_seed(41)
     if torch.cuda.is_available():
-        torch.cuda.manual_seed(42)
+        torch.cuda.manual_seed(41)
     
     # Base configuration (fixed parameters)
     base_config = {
         'name': 'Model Configuration Test',
-        'num_epochs': 2,  # Reduced for faster testing
+        'num_epochs': 50,  # Reduced for faster testing
         'learning_rate': 1e-3,
         'weight_decay': 1e-8,
         'pretrained': True,
         'early_stopping_patience': 5,
         'early_stopping_min_delta': 0.001,
-        'verbose': False,  # Keep output clean during CV
+        'verbose': True,  # Keep output clean during CV
         'save_plots': False,
         
         # Data configuration
@@ -448,7 +448,7 @@ def main():
         'image_type': 'W',
         'test_size': 0.3,
         'n_splits': 5,
-        'random_state': 42,
+        'random_state': 41,
         'augmentations_per_image': 10,
         'img_size': (128, 128),  # Fixed image size
         
